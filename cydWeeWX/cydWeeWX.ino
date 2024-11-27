@@ -38,15 +38,24 @@
 #include <ArduinoJson.h>
 #include <TaskScheduler.h>
 
+// If using WOKWi simulator include simulated WeeWX query
+#ifdef CYD_WWX_RUN_ON_WOKWI
+#include "cydWeeWXWokwi.h"
+#endif
+
 int brightness = CYD_WWX_BL_BRIGHTNESS;
 
 // WiFi Manager Config
-#define WM_TRIGGER_PIN 0
 WiFiManager wm; // global wm instance
 WiFiManagerParameter * wmWeeWXUrl; // global param ( for non blocking w params )
 bool wifiManagerActive = false;
 uint32_t wifiManagerActiveTime = 0;
 String cydWeeWXPassword = String(CYD_WWX_WM_AP_PASSWORD);
+#ifndef CYD_WWX_RUN_ON_WOKWI
+int cydWeeWXWmTriggerPin = CYD_WWX_WM_TRIGGER_PIN;
+#else
+int cydWeeWXWmTriggerPin = CYD_WWX_WOKWI_TRIGGER_PIN;
+#endif
 
 // WeeWX server url and preferences storage
 String cydWeeWXUrl = String(CYD_WWX_WEEWX_URL);
@@ -105,7 +114,7 @@ String pressure = String();
 String trendPressure = String();
 String unitsPressure = String();
 
-String iconRainRate = String(WI_RAINDROPS);
+String iconRainRate = String(WI_UMBRELLA);
 String rainRate = String();
 String trendRainRate = String();
 String unitsRainRate = String();
@@ -332,33 +341,37 @@ void wifiConfigCB() {
 
 int wifiManagerPinCount = 0;
 void tCheckWifiManagerPinCB() {
-  if (!digitalRead(WM_TRIGGER_PIN)) {
+  if (!digitalRead(cydWeeWXWmTriggerPin)) {
     wifiManagerPinCount += 1;
+    LOG_DEBUG("tCheckWifiManagerPinCB", "Trigger pin " << cydWeeWXWmTriggerPin << " held for " << wifiManagerPinCount << " cycles");
   } else{
     wifiManagerPinCount = 0;
   }
 
-  LOG_DEBUG("tCheckWifiManagerPinCB", "Trigger pin held for " << wifiManagerPinCount << "cycles");
-
-  if (wifiManagerPinCount > CYD_WWX_WM_PIN_HOLD_COUNT) {
+  if (wifiManagerPinCount >= CYD_WWX_WM_TRIGGER_PIN_HOLD_COUNT) {
     LOG_DEBUG("tCheckWifiManagerPinCB", "Trigger pin pressed long enough.");
     wifiManagerPinCount = 0;
+    if ((wm.getConfigPortalActive())) {
+      LOG_DEBUG("tCheckWifiManagerPinCB", "Stop ConfigPortal.");
+      wm.stopConfigPortal();
+    } else {
+      LOG_DEBUG("tCheckWifiManagerPinCB", "Start ConfigPortal.");
+      wm.setConfigPortalTimeout(CYD_WWX_WM_TIMEOUT);
+      wm.setSaveConfigCallback(wifiConfigCB);
+      wm.setBreakAfterConfig(true);
+      wm.setConfigPortalBlocking(false);
 
-    wm.setConfigPortalTimeout(CYD_WWX_WM_TIMEOUT);
-    wm.setSaveConfigCallback(wifiConfigCB);
-    wm.setBreakAfterConfig(true);
-    wm.setConfigPortalBlocking(false);
+      tProcessWifiManager.enable();
+      tTimerWifiManager.enable();
+      //tCheckWifiManagerPin.disable();
+      if(!wm.startConfigPortal(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {
+        LOG_INFO("tCheckWifiManagerPinCB", "Failed to connect or hit timeout");
+      } else {   
+        LOG_INFO("tCheckWifiManagerPinCB", "WiFi connected.");
+      }
 
-    tProcessWifiManager.enable();
-    tTimerWifiManager.enable();
-    tCheckWifiManagerPin.disable();
-    if(!wm.startConfigPortal(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {
-      LOG_INFO("tCheckWifiManagerPinCB", "Failed to connect or hit timeout");
-    } else {   
-      LOG_INFO("tCheckWifiManagerPinCB", "WiFi connected.");
+      displayReInit(displayname::WIFI_MANAGER_MAIN);
     }
-
-    displayReInit(displayname::WIFI_MANAGER_MAIN);
   }
 }
 
@@ -371,10 +384,23 @@ void tProcessWifiManagerCB() {
     if (saveCydWeeWXConfigNow) {
       saveCydWeeWxConfig();
     }
+#ifdef CYD_WWX_RUN_ON_WOKWI 
+    // Switch between night and day each time
+    cydWeeWXWokiIsDay = !cydWeeWXWokiIsDay;
+
+    // This is a hack to restart the WiFi in WokWi after exiting the Config Portal
+    WiFi.begin("Wokwi-GUEST", "", 6);
+    LOG_INFO("setup","Connecting to Wokwi-Guest");
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(100);
+      LOG_INFO("setup", "=> waiting");
+    }
+    LOG_INFO("setup","Connected to Wokwi-Guest");
+#endif // CYD_WWX_RUN_ON_WOKWI
     if (WiFi.isConnected()) {
       tProcessWifiManager.disable();
       tTimerWifiManager.disable();
-      tCheckWifiManagerPin.enable();
+      //tCheckWifiManagerPin.enable();
       displayReInit(displayname::WEEWX_MAIN);
     } else {
       ESP.restart();
@@ -1282,16 +1308,24 @@ void getWeeWXData() {
   }
   LOG_DEBUG("getWeeWXData", "getWeeWXData:");
   if (WiFi.status() == WL_CONNECTED) {
+    
+#ifndef CYD_WWX_RUN_ON_WOKWI  
     String weeWXJsonUrl = String(cydWeeWXUrl + CYD_WWX_WEEWX_JSON_DATA_FILE);
     HTTPClient http;
     LOG_DEBUG("getWeeWXData", "      Request WeeWX Data from: " << weeWXJsonUrl.c_str());
     http.begin(String(weeWXJsonUrl));
     int httpCode = http.GET(); // Make the GET request
-
-    if ((httpCode > 0) && (httpCode != 404)) {
+#else  //  CYD_WWX_RUN_ON_WOKWI is defined and in WOKWi simulator
+    int httpCode = 200;
+#endif  // ndef CYD_WWX_RUN_ON_WOKWI
+    if (httpCode > 0) {
       // Check for the response
       if (httpCode == HTTP_CODE_OK) {
+#ifndef CYD_WWX_RUN_ON_WOKWI 
         String payload = http.getString();
+#else  //  CYD_WWX_RUN_ON_WOKWI is defined and in WOKWi simulator
+        String payload = String(cydWeeWXWokwiJSON);
+#endif  // ndef CYD_WWX_RUN_ON_WOKWI
         LOG_DEBUG("getWeeWXData", "Request information:");
         LOG_DEBUG("getWeeWXData", payload);
         // Parse the JSON to extract the time
@@ -1416,7 +1450,12 @@ void getWeeWXData() {
           moonrise = String(doc["almanac"]["moonrise"]);
           moonset = String(doc["almanac"]["moonset"]);
           isDay = ((int)doc["almanac"]["is day"] == 1);
-
+#ifdef CYD_WWX_RUN_ON_WOKWI
+          if (!(isDay = cydWeeWXWokiIsDay)) { // Override in WOKWi simulator to switch between day and night
+            screenHeader = String(location + " (Lat:" + latitude + ", Lon:" + longitude + ") - "
+                        + datetime_str.substring(0, splitIndex) + " @" + "21:30");
+          }
+#endif // CYD_WWX_RUN_ON_WOKWI
           LOG_DEBUG("getWeeWXData", "Sunrise: " << sunrise);
           LOG_DEBUG("getWeeWXData", "Sunset: " << sunset);
           LOG_DEBUG("getWeeWXData", "Moonrise: " << moonrise);
@@ -1424,26 +1463,36 @@ void getWeeWXData() {
 
           setMoonPhaseString( moonPhasePercent, moonWaxing);
 
-        } else {
+        } else {  // DeserializationError error
 
           LOG_ERROR("getWeeWXData", "deserializeJson() failed: " << error.c_str());
 
           cydWeeWXErrorState = true;
           errorDescription = String("WeeWX data deserializeJson() failed: " + String(error.c_str()));
-        }
-        
-      }
-    } else {
+        } // Not DeserializationError error
+ #ifndef CYD_WWX_RUN_ON_WOKWI        
+      } else {  // HTTP_CODE_OK not 200
+
+        LOG_ERROR("getWeeWXData", "GET request failed, error: " << httpCode << " - " << http.errorToString(httpCode).c_str());
+        cydWeeWXErrorState = true;
+        errorDescription = String("WeeWX GET request failed, error: " + String(httpCode));
+      } // HTTP_CODE_OK == 200
+    } else {  // HTTP_CODE_OK < 0 
       LOG_ERROR("getWeeWXData", "GET request failed, error: " << httpCode << " - " << http.errorToString(httpCode).c_str());
       cydWeeWXErrorState = true;
       errorDescription = String("WeeWX GET request failed, error: " + String(http.errorToString(httpCode).c_str()));
-    }
+    }  // HTTP_CODE_OK >= 0
+
     http.end(); // Close connection
-  } else {
+#else // in WOKWi simulation
+      }
+    }
+#endif  // CYD_WWX_RUN_ON_WOKWI
+  } else {  // Not connected to WiFi
     LOG_ERROR("getWeeWXData", "Not connected to Wi-Fi");
     cydWeeWXErrorState = true;
     errorDescription = String("Not connected to Wi-Fi");
-  }
+  } // Connected to WiFi
 }
 
 uint32_t cydWeeWXTickCB() {
@@ -1505,10 +1554,18 @@ void setup() {
   if (!ledcAttach(CYD_WWX_BL_PIN, CYD_WWX_BL_BASE_FREQ, CYD_WWX_BL_TIMER_8_BIT)) {
     LOG_ERROR("setup", "ledcAttach failure for pin: " << CYD_WWX_BL_PIN);
   } else {
-    pinMode(WM_TRIGGER_PIN, INPUT);  // Pin to detect to activate WiFi Manager Portal
+    if (!ledcWrite(CYD_WWX_BL_PIN, brightness)) {
+      LOG_ERROR("setup", "Backlight could not be set on pin: " << CYD_WWX_BL_PIN);
+    }
   }
 
+  pinMode(cydWeeWXWmTriggerPin, INPUT_PULLUP);  // Pin to detect to activate WiFi Manager Portal
+
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
+
+  #ifdef CYD_WWX_RUN_ON_WOKWI
+    //wm.preloadWiFi(CYD_WWX_WOKWI_AP_SSID, CYD_WWX_WOKWI_AP_PASSWORD);
+  #endif // CYD_WWX_RUN_ON_WOKWI
   
   wmWeeWXUrl = new WiFiManagerParameter("URL", "WeeWX URL", cydWeeWXUrl.c_str(), CYD_WWX_WEEWX_URL_FIELD_LENGTH);
   
@@ -1554,9 +1611,6 @@ void setup() {
   cydWeeWXDisp = lv_tft_espi_create(CYD_WWX_SCREEN_WIDTH, CYD_WWX_SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
   lv_display_set_rotation(cydWeeWXDisp, CYD_WWX_ROTATE_SCREEN);
 
-  if (!ledcWrite(CYD_WWX_BL_PIN, brightness)) {
-    LOG_ERROR("setup", "Backlight could not be set on pin: " << CYD_WWX_BL_PIN);
-  }
 
   // Set up Task Scheduler
   cydScheduler.init();
@@ -1577,7 +1631,6 @@ void setup() {
     
     tWeeWXUpdate.enable();
     tOpenMeteoUpdate.enable();
-    tCheckWifiManagerPin.enable();
 
   } else {
     LOG_INFO("setup", "Wifi is NOT connected.");
@@ -1588,14 +1641,14 @@ void setup() {
     tTimerWifiManager.enable();
   }
 
-  
+  tCheckWifiManagerPin.enable();
   tLvglHandler.enable();
 
   // Set up scheduler and tasks
   
   cydScheduler.startNow();
 
-  LOG_INFO("setup", "Exiting setup.");
+  LOG_INFO("setup", "Leaving setup.");
 }
 
 void loop() {

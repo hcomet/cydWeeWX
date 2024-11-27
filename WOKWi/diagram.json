@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": -4.9, "left": -168.2, "attrs": {} },
+    {
+      "type": "wokwi-ili9341",
+      "id": "lcd1",
+      "top": -81,
+      "left": 126.5,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 275,
+      "left": -144,
+      "attrs": { "color": "green" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    [ "esp:3V3", "lcd1:VCC", "green", [ "v-1.05", "h57.3", "v-123.75" ] ],
+    [ "esp:GND.1", "lcd1:GND", "black", [ "h47.7", "v-105.7" ] ],
+    [ "esp:D15", "lcd1:CS", "green", [ "h38.1", "v-86.6" ] ],
+    [ "esp:D4", "lcd1:RST", "green", [ "h18.9", "v-57.5" ] ],
+    [ "esp:D2", "lcd1:D/C", "green", [ "h28.5", "v-58.3" ] ],
+    [ "esp:D13", "lcd1:MOSI", "green", [ "h-19.2", "v76.6", "h211.2", "v-134.39" ] ],
+    [ "esp:D14", "lcd1:SCK", "green", [ "h-38.4", "v115.3", "h240", "v-143.99" ] ],
+    [ "esp:D12", "lcd1:MISO", "green", [ "h-28.8", "v95.3", "h240", "v-115.19" ] ],
+    [ "btn1:2.l", "esp:GND.2", "green", [ "h-28.8", "v-143.9" ] ],
+    [ "btn1:1.l", "esp:D26", "green", [ "h-67.2", "v-268.9" ] ]
+  ],
+  "dependencies": {}
+}

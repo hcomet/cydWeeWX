@@ -61,8 +61,9 @@
 #define CYD_WWX_WM_AP_PASSWORD CYD_WWX_WM_AP_NAME
 //#define WIFI_MANAGER_ENABLE_PASSWORD_RANDOM        // if defined will add a 4 digit random value to the password on every system boot
 #define CYD_WWX_WM_TITLE "Management Portal"
+#define CYD_WWX_WM_TRIGGER_PIN 0
 #define CYD_WWX_WM_TIMEOUT 300
-#define CYD_WWX_WM_PIN_HOLD_COUNT 20 // Pin must be held down this value times CYD_WWX_CHECK_WM_PIN_EVERY in msec
+#define CYD_WWX_WM_TRIGGER_PIN_HOLD_COUNT 20 // Pin must be held down this value times CYD_WWX_CHECK_WM_PIN_EVERY in msec
 #define CYD_WWX_WM_AP_SCREEN_MESSAGE "WiFi Manager Portal is Active.\nCurrently in AP Mode.\nSSID: %s\nPassword: %s\nGo to: 191.168.4.1\nand set-up WiFi."
 #define CYD_WWX_WM_ST_SCREEN_MESSAGE "WiFi Manager Portal is Active.\nCurrently in Station Mode.\nPortal IP Address: %s."
 #define CYD_WWX_WM_TIMER_MESSAGE "Portal closes in %02d:%02d"
@@ -76,7 +77,7 @@
 
 // Logging Macros 
 #define CYD_WEEWX_LOG_OUTPUT Serial
-#define CYD_WEEWX_ENABLE_DEBUG_LOG
+//#define CYD_WEEWX_ENABLE_DEBUG_LOG
 #define CYD_WEEWX_ENABLE_INFO_LOG
 #define CYD_WEEWX_ENABLE_ERROR_LOG
 #if defined CYD_WEEWX_ENABLE_DEBUG_LOG || defined CYD_WEEWX_ENABLE_DEBUG_LOG || defined CYD_WEEWX_ENABLE_ERROR_LOG
@@ -102,5 +103,11 @@ inline Print &operator<<(Print &obj, T arg)
 #else
 #define LOG_ERROR(svc, content) 
 #endif  // CYD_WEEWX_ENABLE_ERROR_LOG
+
+// To run on the Wokwi simulator
+//#define CYD_WWX_RUN_ON_WOKWI
+#define CYD_WWX_WOKWI_TRIGGER_PIN 26
+#define CYD_WWX_WOKWI_AP_SSID "Wokwi-GUEST"
+#define CYD_WWX_WOKWI_AP_PASSWORD ""
 
 #endif // CYD_WEEWX_DEFINES
