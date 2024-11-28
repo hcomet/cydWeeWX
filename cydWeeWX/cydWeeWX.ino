@@ -235,7 +235,7 @@ static lv_obj_t * textLabelIconMoonPhase;
 static lv_obj_t * weatherIconBox;
 
 // Weather readings Grid
-static int32_t sensorReadingsGridColumnDsc[] = {17,65,15,60,25, LV_GRID_TEMPLATE_LAST};   /* 2 columns with 100- and 400-px width */
+static int32_t sensorReadingsGridColumnDsc[] = {20,65,15,60,25, LV_GRID_TEMPLATE_LAST};   /* 2 columns with 100- and 400-px width */
 static int32_t sensorReadingsGridRowDsc[] = {25, 25, 25, 25, 25, LV_GRID_TEMPLATE_LAST}; /* 3 100-px tall rows */
 static lv_obj_t * sensorReadingsGrid;
 
@@ -395,7 +395,6 @@ void tProcessWifiManagerCB() {
       delay(100);
       LOG_INFO("setup", "=> waiting");
     }
-    LOG_INFO("setup","Connected to Wokwi-Guest");
 #endif // CYD_WWX_RUN_ON_WOKWI
     if (WiFi.isConnected()) {
       tProcessWifiManager.disable();
@@ -753,7 +752,7 @@ void createMainWeeWXGui(void) {
   
   // Sensor readings grid row 4 start with Wind Gust
   textLabelReadingsGrid41 = lv_label_create(sensorReadingsGrid);
-  lv_obj_set_grid_cell(textLabelReadingsGrid41, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
+  lv_obj_set_grid_cell(textLabelReadingsGrid41, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
   lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid41, &weathericons_22c, 0);
   lv_obj_add_style(textLabelReadingsGrid41, &cellStyle, 0);
   lv_label_set_text(textLabelReadingsGrid41, iconWindGust.c_str());
@@ -1564,7 +1563,7 @@ void setup() {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
 
   #ifdef CYD_WWX_RUN_ON_WOKWI
-    //wm.preloadWiFi(CYD_WWX_WOKWI_AP_SSID, CYD_WWX_WOKWI_AP_PASSWORD);
+    wm.preloadWiFi(CYD_WWX_WOKWI_AP_SSID, CYD_WWX_WOKWI_AP_PASSWORD);
   #endif // CYD_WWX_RUN_ON_WOKWI
   
   wmWeeWXUrl = new WiFiManagerParameter("URL", "WeeWX URL", cydWeeWXUrl.c_str(), CYD_WWX_WEEWX_URL_FIELD_LENGTH);
