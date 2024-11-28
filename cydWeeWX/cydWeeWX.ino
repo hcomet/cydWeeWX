@@ -395,6 +395,7 @@ void tProcessWifiManagerCB() {
       delay(100);
       LOG_INFO("setup", "=> waiting");
     }
+    LOG_INFO("setup","Connected to Wokwi-Guest"); 
 #endif // CYD_WWX_RUN_ON_WOKWI
     if (WiFi.isConnected()) {
       tProcessWifiManager.disable();
