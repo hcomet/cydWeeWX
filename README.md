@@ -23,7 +23,7 @@ The main display shows current weather data including:
 * Moonrise and Moonset.
 * Moon phase.
 
-All units shown are based on the units provided by the WeeWX data query. Similarly the time is shown assuming the WeeWX query provides local time. The WeeWX data query relies on the installation of [WeeWX-JSON extension](https://github.com/teeks99/weewx-json) modified to also generate a custom JSON report with a new report template, [cyd_weewx.json.tmpl](./WeeWX/cyd_weewx.json.tmpl).
+All units shown are based on the units provided by the WeeWX data query. Similarly the time is shown assuming the WeeWX query provides local time. The WeeWX data query relies on the installation of the [weewx-json extension](https://github.com/teeks99/weewx-json) modified to also generate a custom JSON report with a new report template, [cyd_weewx.json.tmpl](./WeeWX/cyd_weewx.json.tmpl).
 
 WMO icon and icon colors will change based in whether it is currently night or day. The animated GIF above shows the day version while the night version is below.
 
@@ -35,7 +35,7 @@ The cydWeeWX device makes use of Arduino [WiFi Manager](https://github.com/tzapu
 
 ## Configuration
 
-Build and install the cydWeeWX firmware on you CYD as outlined in the [build instructions](./cydWeeWX/README.md). When the cydWeeWX is booted for the first time the WiFI access and the WeeWX server URL will need to be configured. The cydWeeWX display should look as shown:
+Build and install the cydWeeWX firmware on you CYD as outlined in the [build instructions](./cydWeeWX/README.md). Also [install and configure](./WeeWX/README.md) the weewx-json extension on your WeeWX server. When the cydWeeWX is booted for the first time the WiFI access and the WeeWX server URL will need to be configured. The cydWeeWX display should look as shown:
 
 <p align="center">
   <img src="./images/apConfigMessage.jpg" />
