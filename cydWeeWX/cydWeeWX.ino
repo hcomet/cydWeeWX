@@ -43,6 +43,15 @@
 #include "cydWeeWXWokwi.h"
 #endif
 
+// Set up to prevent using the wrong User_Setup.h
+#ifdef WOKWI_USER_SETUP
+#ifndef CYD_WWX_RUN_ON_WOKWI
+#error "WOKWi User_Setup.h included but not configured for WOKWi Simulator build."
+#else
+#warning "This build is for the WOKWi Simulator and will not run properly on physical hardware."
+#endif  // CYD_WWX_RUN_ON_WOKWI
+#endif  // WOKWI_USER_SETUP
+
 int brightness = CYD_WWX_BL_BRIGHTNESS;
 
 // WiFi Manager Config
@@ -52,9 +61,9 @@ bool wifiManagerActive = false;
 uint32_t wifiManagerActiveTime = 0;
 String cydWeeWXPassword = String(CYD_WWX_WM_AP_PASSWORD);
 #ifndef CYD_WWX_RUN_ON_WOKWI
-int cydWeeWXWmTriggerPin = CYD_WWX_WM_TRIGGER_PIN;
+int cydWeeWXTriggerPin = CYD_WWX_WM_TRIGGER_PIN;
 #else
-int cydWeeWXWmTriggerPin = CYD_WWX_WOKWI_TRIGGER_PIN;
+int cydWeeWXTriggerPin = CYD_WWX_WOKWI_TRIGGER_PIN;
 #endif
 
 // WeeWX server url and preferences storage
@@ -64,7 +73,8 @@ bool saveCydWeeWXConfigNow = false;
 
 // Error State tracking and Label text
 bool cydWeeWXErrorState = false;
-String errorDescription = String();
+String errorHeaderMessage = String();
+int cydWeeWXErrorStateTimer = 0;
 
 // String Variables for WiFiManager LVGL Label text
 String wifiManagerMessage = String();
@@ -244,31 +254,56 @@ static int32_t almanacReadingsGridColumnDsc[] = {30,120,30,120, LV_GRID_TEMPLATE
 static int32_t almanacReadingsGridRowDsc[] = {25, 25, 25, LV_GRID_TEMPLATE_LAST}; /* 3 100-px tall rows */
 static lv_obj_t * almanacReadingsGrid;
 
+// 
+// ******************************
 // TaskScheduler items
+// ******************************
+//
+// Declare Call Backs so they can be referenced in the Task declarations.
+void tLvglHandlerCB();
+void tWeeWXUpdateCB();
+void tOpenMeteoUpdateCB();
+void tCydWeeWXTriggerPinCB();
+void tProcessWifiManagerCB();
+void tTimerWifiManagerDisableCB();
+void tTimerWifiManagerCB();
+void tTimerErrorStateCB();
+
+// Task Declarations
+Task tLvglHandler(CYD_WWX_CALL_LVGL_HANDLER_EVERY, TASK_FOREVER, &tLvglHandlerCB);
+Task tWeeWXUpdate(CYD_WWX_GET_WEEWX_UPDATE_EVERY, TASK_FOREVER, &tWeeWXUpdateCB);
+Task tOpenMeteoUpdate(CYD_WWX_GET_OPENMETEO_UPDATE_EVERY, TASK_FOREVER, &tOpenMeteoUpdateCB);
+Task tCydWeeWXTriggerPin(CYD_WWX_CHECK_WM_TRIGGER_PIN_EVERY, TASK_FOREVER, &tCydWeeWXTriggerPinCB);
+Task tProcessWifiManager(CYD_WWX_PROCESS_WM_EVERY, TASK_FOREVER, &tProcessWifiManagerCB);
+Task tTimerWifiManager(CYD_WWX_ONE_SECOND_TIMER, TASK_FOREVER, &tTimerWifiManagerCB, NULL, NULL, NULL, tTimerWifiManagerDisableCB);
+Task tTimerErrorState(CYD_WWX_ONE_SECOND_TIMER, TASK_FOREVER, &tTimerErrorStateCB);
+
+// Task Scheduler
+Scheduler cydScheduler;
+
+// Task Callback implementations
+// LVGL refresh handler
 void tLvglHandlerCB() {
-  
   lv_task_handler();  // let the GUI do its work
 }
 
+// WeeWX Server Query task callback
 void tWeeWXUpdateCB() {
   getWeeWXData();
 }
 
+// Open-Meteo Query task callback
 void tOpenMeteoUpdateCB() {
   getOpenMeteoData();
 }
 
-void tWifiMessageUpdateCB() {
-  setWifiMessage();
-}
-
-void tCheckWifiManagerPinCB();
-void tProcessWifiManagerCB();
-
+// Configuration portal timer task disable callback
 void tTimerWifiManagerDisableCB() {
   wifiManagerActiveTime = 0;
 }
 
+
+// Configuration portal exit timer callback
 void tTimerWifiManagerCB() {
   wifiManagerActiveTime += 1;
   setWifiMessage();
@@ -278,16 +313,112 @@ void tTimerWifiManagerCB() {
   }
 }
 
+// Error state timer callback
+void tTimerErrorStateCB() {
+  if (cydWeeWXErrorState) {
+    cydWeeWXErrorStateTimer += 1;
 
-Task tLvglHandler(CYD_WWX_CALL_LVGL_HANDLER_EVERY, TASK_FOREVER, &tLvglHandlerCB);
-Task tWeeWXUpdate(CYD_WWX_GET_WEEWX_UPDATE_EVERY, TASK_FOREVER, &tWeeWXUpdateCB);
-Task tOpenMeteoUpdate(CYD_WWX_GET_OPENMETEO_UPDATE_EVERY, TASK_FOREVER, &tOpenMeteoUpdateCB);
-Task tCheckWifiManagerPin(CYD_WWX_CHECK_WM_PIN_EVERY, TASK_FOREVER, &tCheckWifiManagerPinCB);
-Task tProcessWifiManager(CYD_WWX_PROCESS_WM_EVERY, TASK_FOREVER, &tProcessWifiManagerCB);
-Task tTimerWifiManager(CYD_WWX_ONE_SECOND_WM_TIMER, TASK_FOREVER, &tTimerWifiManagerCB, NULL, NULL, NULL, tTimerWifiManagerDisableCB);
+    if (cydWeeWXErrorStateTimer >= CYD_WWX_ERROR_WAIT_TO_REBOOT) {
+      LOG_INFO("tTimerErrorStateCB", "Error state greater than " << CYD_WWX_ERROR_WAIT_TO_REBOOT << " seconds. Rebooting device.");
+      ESP.restart();
+    }
+  } else {
+    cydWeeWXErrorStateTimer = 0;
+    tTimerErrorState.disable();
+  }
+}
 
-Scheduler cydScheduler;
+// Check for Trigger Pin hold down Callback
+int cydWeeWXTriggerPinCount = 0;
+void tCydWeeWXTriggerPinCB() {
+  if (!digitalRead(cydWeeWXTriggerPin)) {
+    cydWeeWXTriggerPinCount += 1;
+    LOG_DEBUG("tCydWeeWXTriggerPinCB", "Trigger pin " << cydWeeWXTriggerPin << " held for " << cydWeeWXTriggerPinCount << " cycles");
+  } else{
+    cydWeeWXTriggerPinCount = 0;
+  }
 
+  if (cydWeeWXTriggerPinCount >= CYD_WWX_WM_TRIGGER_PIN_HOLD_COUNT) {
+    LOG_DEBUG("tCydWeeWXTriggerPinCB", "Trigger pin pressed long enough.");
+    cydWeeWXTriggerPinCount = 0;
+    if ((wm.getConfigPortalActive())) {
+      LOG_INFO("tCydWeeWXTriggerPinCB", "Stop ConfigPortal.");
+      wm.stopConfigPortal();
+    } else {
+      LOG_INFO("tCydWeeWXTriggerPinCB", "Start ConfigPortal.");
+      wm.setConfigPortalTimeout(CYD_WWX_WM_TIMEOUT);
+      wm.setSaveConfigCallback(wifiConfigCB);
+      wm.setBreakAfterConfig(true);
+      wm.setConfigPortalBlocking(false);
+
+      tProcessWifiManager.enable();
+      tTimerWifiManager.enable();
+      // WM in nonblocking so return status check has limited value.
+      if(wm.startConfigPortal(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {  
+        LOG_INFO("tCydWeeWXTriggerPinCB", "WiFi connected.");
+      }
+
+      displayReInit(displayname::WIFI_MANAGER_MAIN);
+    }
+  }
+}
+
+// Process Configuration Portal Callback
+void tProcessWifiManagerCB() {
+  
+  if (wm.getConfigPortalActive()) {
+    wm.process();
+  } else {
+    LOG_DEBUG("tProcessWifiManagerCB", "WM Portal no longer active.");
+    if (saveCydWeeWXConfigNow) {
+      saveCydWeeWxConfig();
+    }
+#ifdef CYD_WWX_RUN_ON_WOKWI 
+    // Switch between night and day each time
+    cydWeeWXWokiIsDay = !cydWeeWXWokiIsDay;
+#ifndef CYD_WWX_WOKWI_SHOW_ERROR_STATE
+    // This is a hack to restart the WiFi in WokWi after exiting the Config Portal
+    WiFi.begin("Wokwi-GUEST", "", 6);
+    LOG_INFO("tProcessWifiManagerCB","Connecting to Wokwi-Guest");
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(100);
+      LOG_INFO("tProcessWifiManagerCB", "=> waiting");
+    }
+    LOG_INFO("tProcessWifiManagerCB","Connected to Wokwi-Guest"); 
+#endif  //CYD_WWX_WOKWI_SHOW_ERROR_STATE
+#endif  // CYD_WWX_RUN_ON_WOKWI
+    tProcessWifiManager.disable();
+    tTimerWifiManager.disable();
+#ifndef CYD_WWX_RUN_ON_WOKWI 
+    if (WiFi.isConnected()) {
+      displayReInit(displayname::WEEWX_MAIN);
+    } else {
+      LOG_ERROR("tProcessWifiManagerCB", "WiFi not connected. Rebooting.");
+
+      ESP.restart();
+    }
+#else
+    displayReInit(displayname::WEEWX_MAIN);
+#endif
+  }
+
+}
+
+// ***************************************
+// WiFi Manager Callback
+// - executed when Config Portal shuts down
+void wifiConfigCB() {
+
+    displayReInit(displayname::WEEWX_MAIN);
+}
+
+
+//
+// ****************************
+// LVGL Display cleanup
+// - WiFi Manager shutdown seems to scramble LVGL so need to reinitialize on exit.
+// ****************************
+//
 void displayCleanup( void )
 {
   if (currentActiveDisplay == displayname::WEEWX_MAIN ) {
@@ -324,7 +455,7 @@ void displayReInit( displayname whichDisplay )
   if (whichDisplay == displayname::WEEWX_MAIN) {
       tWeeWXUpdate.enable();
       tOpenMeteoUpdate.enable();
-      cydWeeWXErrorState = false;
+      setCydWeeWXErrorState( false );
       getWeeWXData();
       getOpenMeteoData();
       createMainWeeWXGui();
@@ -334,81 +465,20 @@ void displayReInit( displayname whichDisplay )
   }
 }
 
-void wifiConfigCB() {
+// Set Error State
+void setCydWeeWXErrorState(bool state) {
+  cydWeeWXErrorState = state;
 
-    displayReInit(displayname::WEEWX_MAIN);
-}
-
-int wifiManagerPinCount = 0;
-void tCheckWifiManagerPinCB() {
-  if (!digitalRead(cydWeeWXWmTriggerPin)) {
-    wifiManagerPinCount += 1;
-    LOG_DEBUG("tCheckWifiManagerPinCB", "Trigger pin " << cydWeeWXWmTriggerPin << " held for " << wifiManagerPinCount << " cycles");
-  } else{
-    wifiManagerPinCount = 0;
-  }
-
-  if (wifiManagerPinCount >= CYD_WWX_WM_TRIGGER_PIN_HOLD_COUNT) {
-    LOG_DEBUG("tCheckWifiManagerPinCB", "Trigger pin pressed long enough.");
-    wifiManagerPinCount = 0;
-    if ((wm.getConfigPortalActive())) {
-      LOG_DEBUG("tCheckWifiManagerPinCB", "Stop ConfigPortal.");
-      wm.stopConfigPortal();
-    } else {
-      LOG_DEBUG("tCheckWifiManagerPinCB", "Start ConfigPortal.");
-      wm.setConfigPortalTimeout(CYD_WWX_WM_TIMEOUT);
-      wm.setSaveConfigCallback(wifiConfigCB);
-      wm.setBreakAfterConfig(true);
-      wm.setConfigPortalBlocking(false);
-
-      tProcessWifiManager.enable();
-      tTimerWifiManager.enable();
-      //tCheckWifiManagerPin.disable();
-      if(!wm.startConfigPortal(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {
-        LOG_INFO("tCheckWifiManagerPinCB", "Failed to connect or hit timeout");
-      } else {   
-        LOG_INFO("tCheckWifiManagerPinCB", "WiFi connected.");
-      }
-
-      displayReInit(displayname::WIFI_MANAGER_MAIN);
-    }
-  }
-}
-
-void tProcessWifiManagerCB() {
-  
-  if (wm.getConfigPortalActive()) {
-    wm.process();
+  if (cydWeeWXErrorState) {
+    tTimerErrorState.enable();
   } else {
-    LOG_DEBUG("tProcessWifiManagerCB", "WM Portal no longer active.");
-    if (saveCydWeeWXConfigNow) {
-      saveCydWeeWxConfig();
-    }
-#ifdef CYD_WWX_RUN_ON_WOKWI 
-    // Switch between night and day each time
-    cydWeeWXWokiIsDay = !cydWeeWXWokiIsDay;
-
-    // This is a hack to restart the WiFi in WokWi after exiting the Config Portal
-    WiFi.begin("Wokwi-GUEST", "", 6);
-    LOG_INFO("setup","Connecting to Wokwi-Guest");
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(100);
-      LOG_INFO("setup", "=> waiting");
-    }
-    LOG_INFO("setup","Connected to Wokwi-Guest"); 
-#endif // CYD_WWX_RUN_ON_WOKWI
-    if (WiFi.isConnected()) {
-      tProcessWifiManager.disable();
-      tTimerWifiManager.disable();
-      //tCheckWifiManagerPin.enable();
-      displayReInit(displayname::WEEWX_MAIN);
-    } else {
-      ESP.restart();
-    }
+    tTimerErrorState.disable();
+    cydWeeWXErrorState = false;
+    cydWeeWXErrorStateTimer = 0;
   }
-
 }
 
+// Set the Sensor trend arrow direction string
 void setSensorTrend( float trend, sensortype::sensor type) {
   String trendString = String();
 
@@ -454,6 +524,12 @@ void setSensorTrend( float trend, sensortype::sensor type) {
 
 }
 
+// Timer callback used by LVGL to get elapsed time in msec
+uint32_t cydWeeWXTickCB() {
+  return (esp_timer_get_time() / 1000LL);
+}
+
+// LVGL Timer refresh callback
 static void timer_cb(lv_timer_t * timer) {
   LV_UNUSED(timer);
 
@@ -478,9 +554,9 @@ static void timer_cb(lv_timer_t * timer) {
     if (cydWeeWXErrorState) {
       setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
       lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelWeatherDescription, errorDescription.c_str());
+      lv_label_set_text(textLabelWeatherDescription, String("Error state. Reboot in: " + String(CYD_WWX_ERROR_WAIT_TO_REBOOT-cydWeeWXErrorStateTimer) + " seconds.").c_str());
       lv_obj_set_style_text_color((lv_obj_t*) textLabelScreenHeader, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelScreenHeader, errorDescription.c_str());
+      lv_label_set_text(textLabelScreenHeader, errorHeaderMessage.c_str());
     } else {
       setWmoIconAndDescription(weatherCode);
       lv_label_set_text(textLabelWeatherDescription, weatherDescription.c_str());
@@ -536,6 +612,7 @@ static void timer_cb(lv_timer_t * timer) {
 
 }
 
+// Create cydWeeWX GUI when in configuration portal mode
 void createMainWifiManagerGui(void) {
 
   currentActiveDisplay = displayname::WIFI_MANAGER_MAIN;
@@ -556,7 +633,7 @@ void createMainWifiManagerGui(void) {
 
   textLabelWifiManagerTimer = lv_label_create(lv_screen_active());
   lv_label_set_text(textLabelWifiManagerTimer, wifiManagerTimer.c_str());
-  lv_obj_align(textLabelWifiManagerTimer, LV_ALIGN_CENTER, 0, 50);
+  lv_obj_align(textLabelWifiManagerTimer, LV_ALIGN_CENTER, 0, 80);
   lv_obj_set_style_text_font((lv_obj_t*) textLabelWifiManagerTimer, &lv_font_montserrat_16, 0);
   lv_label_set_long_mode(textLabelWifiManagerTimer, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_color((lv_obj_t*) textLabelWifiManagerTimer, lv_color_hex(CYD_WWX_WIFI_MANAGER_TEXT_COLOR), 0);
@@ -568,6 +645,7 @@ void createMainWifiManagerGui(void) {
 
 }
 
+// Create main GUI when in standard WeeWX mode
 void createMainWeeWXGui(void) {
 
   currentActiveDisplay = displayname::WEEWX_MAIN;
@@ -858,22 +936,23 @@ void createMainWeeWXGui(void) {
   lv_timer_ready(timer);
 }
 
-/*
-  WMO Weather interpretation codes (WW)- Code	Description
-  0	Clear sky
-  1, 2, 3	Mainly clear, partly cloudy, and overcast
-  45, 48	Fog and depositing rime fog
-  51, 53, 55	Drizzle: Light, moderate, and dense intensity
-  56, 57	Freezing Drizzle: Light and dense intensity
-  61, 63, 65	Rain: Slight, moderate and heavy intensity
-  66, 67	Freezing Rain: Light and heavy intensity
-  71, 73, 75	Snow fall: Slight, moderate, and heavy intensity
-  77	Snow grains
-  80, 81, 82	Rain showers: Slight, moderate, and violent
-  85, 86	Snow showers slight and heavy
-  95 *	Thunderstorm: Slight or moderate
-  96, 99 *	Thunderstorm with slight and heavy hail
-*/
+// Set Icon and Description based on WMO code
+// WMO Weather interpretation codes (WW)- Code	Description
+// 0	Clear sky
+// 1, 2, 3	Mainly clear, partly cloudy, and overcast
+// 45, 48	Fog and depositing rime fog
+// 51, 53, 55	Drizzle: Light, moderate, and dense intensity
+// 56, 57	Freezing Drizzle: Light and dense intensity
+// 61, 63, 65	Rain: Slight, moderate and heavy intensity
+// 66, 67	Freezing Rain: Light and heavy intensity
+// 71, 73, 75	Snow fall: Slight, moderate, and heavy intensity
+// 77	Snow grains
+// 80, 81, 82	Rain showers: Slight, moderate, and violent
+// 85, 86	Snow showers slight and heavy
+// 95 *	Thunderstorm: Slight or moderate
+// 96, 99 *	Thunderstorm with slight and heavy hail
+// 1000 Special for cydWeeWX Error State 
+
 void setWmoIconAndDescription(int code) {
   
   switch (code) {
@@ -1085,6 +1164,7 @@ void setWmoIconAndDescription(int code) {
   }
 }
 
+// Return weather direction error based on direction in degrees
 String getWindDirectionString(double direction)
 {
   String directionString = String();
@@ -1114,6 +1194,7 @@ String getWindDirectionString(double direction)
   return directionString;
 }
 
+// Set the moon phase icon and description based on phase % and whether or not waxing
 void setMoonPhaseString(int phasePercent, bool isWaxing)
 {
   if (phasePercent > 95) {
@@ -1229,6 +1310,7 @@ void setMoonPhaseString(int phasePercent, bool isWaxing)
   }
 }
 
+// set & update the messages displayed while in Configuration Portal Mode
 void setWifiMessage() {
   if (wm.getConfigPortalActive()) {
     char buf[256] = {};
@@ -1250,6 +1332,7 @@ void setWifiMessage() {
   }
 }
 
+// Do Open-Meteo query to get WMO weather code 
 void getOpenMeteoData() {
   if (cydWeeWXErrorState) {
     LOG_INFO("getOpenMeteoData", "In error state, skipping GET processing.");
@@ -1279,28 +1362,30 @@ void getOpenMeteoData() {
           weatherCode = om_doc["current"]["weather_code"];
         } else {
           LOG_ERROR("getOpenMeteoData", "deserializeJson() OpenMeteo Response failed: " << error.c_str());
-          cydWeeWXErrorState = true;
-          errorDescription = String("Deserialization error, cannot retrieve WMO icon.");
+          setCydWeeWXErrorState( true );
+          errorHeaderMessage = String("Deserialization error, cannot retrieve WMO icon.");
         }
       } else {
         LOG_ERROR("getOpenMeteoData", "GET request failed, error: " << http.errorToString(httpCode).c_str());
-        cydWeeWXErrorState = true;
-        errorDescription = String("Open-Meteo GET request failed, error: " + http.errorToString(httpCode));
+        setCydWeeWXErrorState(true);
+        errorHeaderMessage = String("Open-Meteo GET request failed, error: " + http.errorToString(httpCode));
       }
 
       http.end(); // Close connection
     } else {
       LOG_ERROR("getOpenMeteoData", "Latitude or longitude is blank, cannot retrieve WMO icon.");
-      cydWeeWXErrorState = true;
-      errorDescription = String("Latitude or longitude is blank, cannot retrieve WMO icon.");
+      setCydWeeWXErrorState(true);
+      errorHeaderMessage = String("Latitude or longitude is blank, cannot retrieve WMO icon.");
     }
   } else {
     LOG_ERROR("getOpenMeteoData", "Not connected to Wi-Fi");
-    cydWeeWXErrorState = true;
-    errorDescription = String("Not connected to Wi-Fi");
+    setCydWeeWXErrorState(true);
+    errorHeaderMessage = String("Not connected to Wi-Fi");
 
   }
 }
+
+// Do WeeWX server query to update current weather data
 void getWeeWXData() {
   if (cydWeeWXErrorState) {
     LOG_INFO("getWeeWXData", "In error state, skipping GET processing.");
@@ -1467,20 +1552,20 @@ void getWeeWXData() {
 
           LOG_ERROR("getWeeWXData", "deserializeJson() failed: " << error.c_str());
 
-          cydWeeWXErrorState = true;
-          errorDescription = String("WeeWX data deserializeJson() failed: " + String(error.c_str()));
+          setCydWeeWXErrorState(true);
+          errorHeaderMessage = String("WeeWX data deserializeJson() failed: " + String(error.c_str()));
         } // Not DeserializationError error
  #ifndef CYD_WWX_RUN_ON_WOKWI        
       } else {  // HTTP_CODE_OK not 200
 
         LOG_ERROR("getWeeWXData", "GET request failed, error: " << httpCode << " - " << http.errorToString(httpCode).c_str());
-        cydWeeWXErrorState = true;
-        errorDescription = String("WeeWX GET request failed, error: " + String(httpCode));
+        setCydWeeWXErrorState(true);
+        errorHeaderMessage = String("WeeWX GET request failed, error: " + String(httpCode));
       } // HTTP_CODE_OK == 200
     } else {  // HTTP_CODE_OK < 0 
       LOG_ERROR("getWeeWXData", "GET request failed, error: " << httpCode << " - " << http.errorToString(httpCode).c_str());
-      cydWeeWXErrorState = true;
-      errorDescription = String("WeeWX GET request failed, error: " + String(http.errorToString(httpCode).c_str()));
+      setCydWeeWXErrorState(true);
+      errorHeaderMessage = String("WeeWX GET request failed, error: " + String(http.errorToString(httpCode).c_str()));
     }  // HTTP_CODE_OK >= 0
 
     http.end(); // Close connection
@@ -1490,15 +1575,12 @@ void getWeeWXData() {
 #endif  // CYD_WWX_RUN_ON_WOKWI
   } else {  // Not connected to WiFi
     LOG_ERROR("getWeeWXData", "Not connected to Wi-Fi");
-    cydWeeWXErrorState = true;
-    errorDescription = String("Not connected to Wi-Fi");
+    setCydWeeWXErrorState(true);
+    errorHeaderMessage = String("Not connected to Wi-Fi");
   } // Connected to WiFi
 }
 
-uint32_t cydWeeWXTickCB() {
-  return (esp_timer_get_time() / 1000LL);
-}
-
+// Load the WeeWX server URL from Preferences
 void loadCydWeeWXConfig() {
 
   cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RO);
@@ -1516,6 +1598,7 @@ void loadCydWeeWXConfig() {
   cydWeeWXPreference.end();
 }
 
+// Save the WeeWX server URL to Preferences
 void saveCydWeeWxConfig() {
   char buf[128] = {};
   saveCydWeeWXConfigNow = false;
@@ -1533,12 +1616,14 @@ void saveCydWeeWxConfig() {
   cydWeeWXPreference.end();
 }
 
+// Call back from Configuration portal when SAVE button is clicked for setting the WeeWX server URL
 void saveCydWeeWxConfigCB() {
   
   saveCydWeeWXConfigNow = true;
   LOG_DEBUG("saveCydWeeWxConfigCB", "saveCydWeeWXConfigNow = true;");
 }
 
+// Setup for cydWeeWX
 void setup() {
   String LVGL_Arduino = String("LVGL Library Version: ") + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
   Serial.begin(115200);
@@ -1559,13 +1644,15 @@ void setup() {
     }
   }
 
-  pinMode(cydWeeWXWmTriggerPin, INPUT_PULLUP);  // Pin to detect to activate WiFi Manager Portal
+  pinMode(cydWeeWXTriggerPin, INPUT_PULLUP);  // Pin to detect to activate WiFi Manager Portal
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
 
   #ifdef CYD_WWX_RUN_ON_WOKWI
+  #ifndef CYD_WWX_WOKWI_ENTER_AP_AT_BOOT
     wm.preloadWiFi(CYD_WWX_WOKWI_AP_SSID, CYD_WWX_WOKWI_AP_PASSWORD);
-  #endif // CYD_WWX_RUN_ON_WOKWI
+  #endif  // CYD_WWX_WOKWI_ENTER_AP_AT_BOOT
+  #endif  // CYD_WWX_RUN_ON_WOKWI
   
   wmWeeWXUrl = new WiFiManagerParameter("URL", "WeeWX URL", cydWeeWXUrl.c_str(), CYD_WWX_WEEWX_URL_FIELD_LENGTH);
   
@@ -1594,12 +1681,10 @@ void setup() {
 
   LOG_INFO("setup", "Starting WiFi Manager AP: " << CYD_WWX_WM_AP_NAME << " Password: " << cydWeeWXPassword);
 
-  if(!wm.autoConnect(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {
-    LOG_INFO("setup", "Failed to connect or hit timeout");
-  } else {   
+  // WM in nonblocking mode so checking return status has limited value
+  if(wm.autoConnect(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {  
     LOG_INFO("setup", "WiFi Connected");
   }
-
 
   // Start LVGL
   lv_init();
@@ -1617,9 +1702,10 @@ void setup() {
   cydScheduler.addTask(tLvglHandler);
   cydScheduler.addTask(tWeeWXUpdate);
   cydScheduler.addTask(tOpenMeteoUpdate);
-  cydScheduler.addTask(tCheckWifiManagerPin);
+  cydScheduler.addTask(tCydWeeWXTriggerPin);
   cydScheduler.addTask(tProcessWifiManager);
   cydScheduler.addTask(tTimerWifiManager);
+  cydScheduler.addTask(tTimerErrorState);
   
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -1641,7 +1727,7 @@ void setup() {
     tTimerWifiManager.enable();
   }
 
-  tCheckWifiManagerPin.enable();
+  tCydWeeWXTriggerPin.enable();
   tLvglHandler.enable();
 
   // Set up scheduler and tasks
@@ -1651,6 +1737,7 @@ void setup() {
   LOG_INFO("setup", "Leaving setup.");
 }
 
+// Main loop that only calls the Task Scheduler 
 void loop() {
   // Only need task scheduler in the loop
   cydScheduler.execute();

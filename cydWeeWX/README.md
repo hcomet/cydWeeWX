@@ -24,13 +24,44 @@
 
 The cydWeeWX firmware may be built without any changes to the default settings in the ***cydWeeWXDefines.h*** file. However, there are a couple of customizations that may be made.
 
-  1. Display Backlight.
-  2. Pre-configure WiFi.
-  3. Random Access Point password.
-  4. Device AP and Host name.
-  5. WOKWi.
+  * Set the pin number for backlight control if you have one. Pin 21 seems to be common.
+    ```c
+    #define CYD_WWX_BL_PIN 21 
+    ``` 
+    You may need to remove the pin definition from your ***User_Setup.h*** for PWM blacklight control. This can be done by commenting out the following line in the User_Setup.h:
+
+    ```c
+    //#define TFT_BL   21            // LED back-light control pin
+    ```
+
+  * Change the backlight brightness level. 100 out of 255 seems to work well on my CYD but models vary.
+
+    ```c
+    #define CYD_WWX_BL_BRIGHTNESS 100
+    ```  
+    
+  * Pre-configure configuration portal items.
+  * By default the cydWeeWX will concatenate a 4 digit random value to the end of the Access Point base password resulting in _cydWeeWx####_. This is done on each boot of the device. Commenting out this line will prevent the random value concatenation resulting in _cydWeeWX_ being the password all the time.  
+  
+    ```c
+    #define WIFI_MANAGER_ENABLE_PASSWORD_RANDOM
+    ```  
+   
+  * The default Hostname, Access Point SSID and Base Password may be changed with the following lines:  
+
+    ```c
+    #define CYD_WWX_HOSTNAME "cydWeeWX" 
+    #define CYD_WWX_WM_AP_NAME CYD_WWX_HOSTNAME
+    #define CYD_WWX_WM_AP_PASSWORD CYD_WWX_WM_AP_NAME
+    ```
+
+  * WOKWi Simulation setup is found [here](../WOKWi/README.md).
   
 ### TSP-eSPI ***User_Setup.h***
+
+A ***User_Setup.h*** file that matches your CYD must be placed in the Arduino TFT_eSPI library folder. The one provided in Brian Lough's github [ESP32-Cheap-Yellow-Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) repository generally works. It can be found at [User_Setup.h](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/DisplayConfig/User_Setup.h). Read the [CYD Setup](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/SETUP.md) instructions. 
+
+If you are having display issues then you may have the wrong driver defined. Classic CYD devices seem to work well with either _ILI9341_DRIVER _ or _ILI9341_2_DRIVER _. My CYD had the combination USB2 and USB3 ports and worked well with _ST7789_DRIVER_.
 
 ### LVGL ***lv_conf.h***
 

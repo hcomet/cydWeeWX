@@ -17,7 +17,7 @@
       "id": "btn1",
       "top": 275,
       "left": -144,
-      "attrs": { "color": "green" }
+      "attrs": { "label": "Trigger Button", "color": "green" }
     }
   ],
   "connections": [
