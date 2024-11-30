@@ -1,4 +1,4 @@
-# WeeWX-JSON Extension Installation
+# Installation of the weewx-json Extension 
 
 The cydWeeWX gets the current weather data for your WeeWX weather station using a JSON query to the WeeWX service. This needs to be enabled as follows:
 1. Install the [weewx-json](https://github.com/teeks99/weewx-json) extension on your WeeWX server by following the installation instructions on the [GitHub page](https://github.com/teeks99/weewx-json).
@@ -22,7 +22,7 @@ The cydWeeWX gets the current weather data for your WeeWX weather station using 
 
 If the file was not created then recheck your WeeWX configuration to make sure that the report is enabled and that your HTML_ROOT is where you are looking.
 
-The ***weewx.conf** file should have lines that look similar to the following:
+The ***weewx.conf*** file should have lines that look similar to the following:
 
 ```yaml
         [[JSONReport]]
