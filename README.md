@@ -31,7 +31,7 @@ WMO icon and icon colors will change based in whether it is currently night or d
   <img src="./images/cydWeeWXNight.jpg" />
 </p>
 
-The cydWeeWX device makes use of Arduino [WiFi Manager](https://github.com/tzapu/WiFiManager) library to implement a configuration portal. The configuration portal allows you to set up the WiFi configuration as well as input the URL for your WeeWX server.
+The cydWeeWX device makes use of Arduino [WiFi Manager](https://github.com/tzapu/WiFiManager) library to implement a Configuration Portal. The Configuration Portal allows you to set up the WiFi configuration as well as input the URL for your WeeWX server.
 
 ## Configuration
 
@@ -50,7 +50,7 @@ With a phone, tablet or PC, connect to the cydWeeWX access point at the indicate
 </p>
 
 1. Click on the **Setup** button to go to a page where you can enter your WeeWX URL. The URL must start with "_HTTP://_" and end with a slash, "_/_".
-2. Click **Save** to save the WeeWX URL and hit the browser back button to return to the COnfiguration Portal main page.
+2. Click **Save** to save the WeeWX URL and hit the browser back button to return to the Configuration Portal main page.
 3. Now click **Configure WiFi** to go to the WiFi configuration page.
 4. Enter the _SSID_ and _Password_ for you WiFI network then click **Save**.
 5. At this point the cydWeeWX will attempt to connect to your WiFi network and then display your current weather data.
@@ -82,3 +82,11 @@ The Configuration Portal will timeout after 5 minutes. If WiFi connectivity has 
 ## WOKWi Simulation
 
 The display images shown above were generated using a [WOKWi](https://wokwi.com) simulation of the cydWeeWX. The firmware is too large to use directly on the WOKWi web site but it will run using the VS Code plugin. How to set up the VS Code plugin can be found on the [WOKWi](https://docs.wokwi.com/vscode/getting-started) site. Information about how to build cydWeeWX firmware for simulation can be found [here](./WOKWi/README.md).
+
+## Third Party Acknowledgements
+
+* Brian Lough's [ESP32-Cheap-Yellow-Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/tree/main) site. A great place to go for information on the CYD.
+* [WeeWX](https://www.weewx.com/) open source software for your weather station.
+* Erik Flowers' [Weather Icons](https://erikflowers.github.io/weather-icons/) site. The icons used in the cydWeeWX are LVGL fonts derived from the Weather Icons TTF font created by Erik Flowers. The [weatherIcons_22c.h](./cydWeeWX/weatherIcons_22c.h) and [wmoIcons_64c.h](./cydWeeWX/wmoIcons_64c.h) font files we're produced from the Weather Icons TTF font using the [LVGL Font Converter](https://lvgl.io/tools/fontconverter).
+* [DejaVu Fonts](https://dejavu-fonts.github.io/) used to produce the [dejaVuSansCondensed_18c.h](./cydWeeWX/dejaVuSansCondensed_18c.h) font file with the [LVGL Font Converter](https://lvgl.io/tools/fontconverter).
+

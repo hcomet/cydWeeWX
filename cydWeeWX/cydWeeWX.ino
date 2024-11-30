@@ -29,7 +29,7 @@
 #include <WiFiManager.h>
 #include <TFT_eSPI.h>
 #include "wmoIcons_64c.h"
-#include "weathericons_22c.h"
+#include "weatherIcons_22c.h"
 #include "dejaVuSansCondensed_18c.h"
 #include <Preferences.h>
 #include <esp_timer.h>
@@ -186,11 +186,11 @@ void log_print(lv_log_level_t level, const char * buf) {
 }
 
 // LVGL Styles
-lv_style_t  displayStyle;
+static lv_style_t  displayStyle;
 static lv_style_t myDayStyle;
 static lv_style_t myNightStyle;
-lv_style_t gridStyle;
-lv_style_t cellStyle;
+static lv_style_t gridStyle;
+static lv_style_t cellStyle;
 
 // LGVL Label Text Values
 static lv_obj_t * textLabelWifiManagerMessage;
@@ -245,13 +245,13 @@ static lv_obj_t * textLabelIconMoonPhase;
 static lv_obj_t * weatherIconBox;
 
 // Weather readings Grid
-static int32_t sensorReadingsGridColumnDsc[] = {20,65,15,60,25, LV_GRID_TEMPLATE_LAST};   /* 2 columns with 100- and 400-px width */
-static int32_t sensorReadingsGridRowDsc[] = {25, 25, 25, 25, 25, LV_GRID_TEMPLATE_LAST}; /* 3 100-px tall rows */
+static int32_t sensorReadingsGridColumnDsc[] = {20,65,15,60,25, LV_GRID_TEMPLATE_LAST}; // IconSensor, Reading, Trend, Reading, Units
+static int32_t sensorReadingsGridRowDsc[] = {25, 25, 25, 25, 25, LV_GRID_TEMPLATE_LAST};  // Heading, Temp, Humid, Row3, Row4
 static lv_obj_t * sensorReadingsGrid;
 
 // Almanac readings Grid
-static int32_t almanacReadingsGridColumnDsc[] = {30,120,30,120, LV_GRID_TEMPLATE_LAST};   /* 2 columns with 100- and 400-px width */
-static int32_t almanacReadingsGridRowDsc[] = {25, 25, 25, LV_GRID_TEMPLATE_LAST}; /* 3 100-px tall rows */
+static int32_t almanacReadingsGridColumnDsc[] = {30,120,30,120, LV_GRID_TEMPLATE_LAST}; // Icon, Time, Icon, Time
+static int32_t almanacReadingsGridRowDsc[] = {25, 25, 25, LV_GRID_TEMPLATE_LAST}; // Sun, Moon, Moon phase
 static lv_obj_t * almanacReadingsGrid;
 
 // 
@@ -651,7 +651,7 @@ void createMainWeeWXGui(void) {
   currentActiveDisplay = displayname::WEEWX_MAIN;
 
   LV_FONT_DECLARE(wmoIcons_64c);
-  LV_FONT_DECLARE(weathericons_22c);
+  LV_FONT_DECLARE(weatherIcons_22c);
   LV_FONT_DECLARE(dejaVuSansCondensed_18c);
 
   
@@ -739,7 +739,7 @@ void createMainWeeWXGui(void) {
   // Temperature Outside then Inside
   textLabelIconTemperature = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelIconTemperature, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconTemperature, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconTemperature, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelIconTemperature, &cellStyle, 0);
   lv_label_set_text(textLabelIconTemperature, iconTemperature.c_str());
 
@@ -751,7 +751,7 @@ void createMainWeeWXGui(void) {
 
   textLabelTrendTemperature = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelTrendTemperature, LV_GRID_ALIGN_START, 2, 1, LV_GRID_ALIGN_CENTER, 1, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelTrendTemperature, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelTrendTemperature, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelTrendTemperature, &cellStyle, 0);
   lv_label_set_text(textLabelTrendTemperature, trendTemperature.c_str());
 
@@ -770,7 +770,7 @@ void createMainWeeWXGui(void) {
   // Humidity Outside then Inside
   textLabelIconHumidity = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelIconHumidity, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconHumidity, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconHumidity, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelIconHumidity, &cellStyle, 0);
   lv_label_set_text(textLabelIconHumidity, iconHumidity.c_str());
   
@@ -782,7 +782,7 @@ void createMainWeeWXGui(void) {
 
   textLabelTrendHumidity = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelTrendHumidity, LV_GRID_ALIGN_START, 2, 1, LV_GRID_ALIGN_CENTER, 2, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelTrendHumidity, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelTrendHumidity, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelTrendHumidity, &cellStyle, 0);
   lv_label_set_text(textLabelTrendHumidity, trendHumidity.c_str());
 
@@ -801,7 +801,7 @@ void createMainWeeWXGui(void) {
   // Sensor readings grid row 3 start with  Wind 
   textLabelReadingsGrid31 = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelReadingsGrid31, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 3, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid31, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid31, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelReadingsGrid31, &cellStyle, 0);
   lv_label_set_text(textLabelReadingsGrid31, iconWind.c_str());
   
@@ -813,7 +813,7 @@ void createMainWeeWXGui(void) {
 
   textLabelReadingsGrid33 = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelReadingsGrid33, LV_GRID_ALIGN_START, 2, 1, LV_GRID_ALIGN_CENTER, 3, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid33, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid33, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelReadingsGrid33, &cellStyle, 0);
   lv_label_set_text(textLabelReadingsGrid33, trendWind.c_str());
   
@@ -825,14 +825,14 @@ void createMainWeeWXGui(void) {
 
   textLabelReadingsGrid35 = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelReadingsGrid35, LV_GRID_ALIGN_CENTER, 4, 1, LV_GRID_ALIGN_CENTER, 3, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid35, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid35, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelReadingsGrid35, &cellStyle, 0);
   lv_label_set_text(textLabelReadingsGrid35, windDirection.c_str());
   
   // Sensor readings grid row 4 start with Wind Gust
   textLabelReadingsGrid41 = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelReadingsGrid41, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid41, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid41, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelReadingsGrid41, &cellStyle, 0);
   lv_label_set_text(textLabelReadingsGrid41, iconWindGust.c_str());
   
@@ -844,7 +844,7 @@ void createMainWeeWXGui(void) {
 
   textLabelReadingsGrid43 = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelReadingsGrid43, LV_GRID_ALIGN_START, 2, 1, LV_GRID_ALIGN_CENTER, 4, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid43, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid43, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelReadingsGrid43, &cellStyle, 0);
   lv_label_set_text(textLabelReadingsGrid43, trendWindGust.c_str());
   
@@ -856,7 +856,7 @@ void createMainWeeWXGui(void) {
 
   textLabelReadingsGrid45 = lv_label_create(sensorReadingsGrid);
   lv_obj_set_grid_cell(textLabelReadingsGrid45, LV_GRID_ALIGN_CENTER, 4, 1, LV_GRID_ALIGN_CENTER, 4, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid45, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelReadingsGrid45, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelReadingsGrid45, &cellStyle, 0);
   lv_label_set_text(textLabelReadingsGrid45, windGustDirection.c_str());
   
@@ -870,7 +870,7 @@ void createMainWeeWXGui(void) {
   // Sunrise 
   textLabelIconSunrise = lv_label_create(almanacReadingsGrid);
   lv_obj_set_grid_cell(textLabelIconSunrise, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 0, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconSunrise, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconSunrise, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelIconSunrise, &cellStyle, 0);
   lv_label_set_text(textLabelIconSunrise, String(WI_SUNRISE).c_str());
   
@@ -883,7 +883,7 @@ void createMainWeeWXGui(void) {
   // Sunset
   textLabelIconSunset = lv_label_create(almanacReadingsGrid);
   lv_obj_set_grid_cell(textLabelIconSunset, LV_GRID_ALIGN_CENTER, 2, 1, LV_GRID_ALIGN_CENTER, 0, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconSunset, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconSunset, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelIconSunset, &cellStyle, 0);
   lv_label_set_text(textLabelIconSunset, String(WI_SUNSET).c_str());
     
@@ -896,7 +896,7 @@ void createMainWeeWXGui(void) {
   // Moonrise
   textLabelIconMoonrise = lv_label_create(almanacReadingsGrid);
   lv_obj_set_grid_cell(textLabelIconMoonrise, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconMoonrise, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconMoonrise, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelIconMoonrise, &cellStyle, 0);
   lv_label_set_text(textLabelIconMoonrise, String(WI_MOONRISE).c_str());
   
@@ -909,7 +909,7 @@ void createMainWeeWXGui(void) {
   // Moonset
   textLabelIconMoonset = lv_label_create(almanacReadingsGrid);
   lv_obj_set_grid_cell(textLabelIconMoonset, LV_GRID_ALIGN_CENTER, 2, 1, LV_GRID_ALIGN_CENTER, 1, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconMoonset, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconMoonset, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelIconMoonset, &cellStyle, 0);
   lv_label_set_text(textLabelIconMoonset, String(WI_MOONSET).c_str());
   
@@ -922,7 +922,7 @@ void createMainWeeWXGui(void) {
   // Moon Phase
   textLabelIconMoonPhase = lv_label_create(almanacReadingsGrid);
   lv_obj_set_grid_cell(textLabelIconMoonPhase, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
-  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconMoonPhase, &weathericons_22c, 0);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelIconMoonPhase, &weatherIcons_22c, 0);
   lv_obj_add_style(textLabelIconMoonPhase, &cellStyle, 0);
   lv_label_set_text(textLabelIconMoonPhase, iconMoonPhase.c_str());
   

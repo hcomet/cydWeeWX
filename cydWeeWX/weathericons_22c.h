@@ -3,7 +3,7 @@
 // ** https://erikflowers.github.io/weather-icons/
 // ** Size: 22 px
 // ** Bpp: 4
-// ** Opts: --bpp 4 --size 22 --font weathericons-regular-webfont.ttf --range 61440-61675 --format lvgl -o weathericons_22c.h
+// ** Opts: --bpp 4 --size 22 --font weathericons-regular-webfont.ttf --range 61440-61675 --format lvgl -o weatherIcons_22c.h
 // **********************************************************************************
 // ** Included in the cydWeeWX project https://github.com/hcomet/cydWeeWX
 // **********************************************************************************
@@ -5177,9 +5177,9 @@ static lv_font_fmt_txt_dsc_t font_dsc_weathericons_22c = {
 
 /*Initialize a public general font descriptor*/
 #if LVGL_VERSION_MAJOR >= 8
-const lv_font_t weathericons_22c = {
+const lv_font_t weatherIcons_22c = {
 #else
-lv_font_t weathericons_22c = {
+lv_font_t weatherIcons_22c = {
 #endif
     .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,    /*Function pointer to get glyph's data*/
     .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,    /*Function pointer to get glyph's bitmap*/
