@@ -31,4 +31,4 @@ The ***weewx.conf*** file should have lines that look similar to the following:
             enable = true
 ```
 
-**NOTE:** the ```report_timing = */5 * * * *``` line sets the report to be generated every 5 minutes. You will need to add this if you want the cydWeeWX to display new data every 5 minutes.
+**NOTE:** the ```report_timing = */5 * * * *``` line sets the report to be generated every 5 minutes. You will need to add this if you want cydWeeWX to display new data every 5 minutes.

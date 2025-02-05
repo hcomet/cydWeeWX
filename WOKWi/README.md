@@ -1,6 +1,6 @@
 # Set-up for WOKWi Simulator
 
-[WOKWi](https://wokwi.com) provides an emulation environment for IoT devices like the ESP32. The free version of WOKWi has a limit on the size of firmware that can be compiled and run directly on the site. The cydWeeWX firmware is bigger than that limit. However WOKWi can still be used to simulate the cydWeeWX if the compile and build is done on your own computer using  [WOKWi Simulator for VS Code](https://marketplace.visualstudio.com/items?itemName=Wokwi.wokwi-vscode).
+[WOKWi](https://wokwi.com) provides an emulation environment for IoT devices like the ESP32. The free version of WOKWi has a limit on the size of firmware that can be compiled and run directly on the site. The cydWeeWX firmware is bigger than that limit. However WOKWi can still be used to simulate cydWeeWX if the compile and build is done on your own computer using  [WOKWi Simulator for VS Code](https://marketplace.visualstudio.com/items?itemName=Wokwi.wokwi-vscode).
 
 1. Install the VS Code extension, get a free WOKWi account then get an authorization key for the VS Code extension. The link above provides all the information to do this.
 2. Install the VS Code [Arduino Community Edition](https://marketplace.visualstudio.com/items?itemName=vscode-arduino.vscode-arduino-community) extension. Be sure to configure a build output folder in the ***.vscode/arduino.json*** configuration file by adding ```"output": "(your build folder path)"```

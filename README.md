@@ -31,11 +31,17 @@ WMO icon and icon colors will change based in whether it is currently night or d
   <img src="./images/cydWeeWXNight.jpg" />
 </p>
 
-The cydWeeWX device makes use of Arduino [WiFi Manager](https://github.com/tzapu/WiFiManager) library to implement a Configuration Portal. The Configuration Portal allows you to set up the WiFi configuration as well as input the URL for your WeeWX server.
+The cydWeeWX device makes use of the Arduino [WiFi Manager](https://github.com/tzapu/WiFiManager) library to implement a Configuration Portal. The Configuration Portal allows you to set up the WiFi configuration as well as the URL for your WeeWX server.
 
 ## Configuration
 
-Build and install the cydWeeWX firmware on you CYD as outlined in the [build instructions](./cydWeeWX/README.md). Also [install and configure](./WeeWX/README.md) the weewx-json extension on your WeeWX server. When the cydWeeWX is booted for the first time the WiFI access and the WeeWX server URL will need to be configured. The cydWeeWX display should look as shown:
+Install the cydWeeWX firmware on you CYD by either:
+* building and uploading the firmware yourself using the [build instructions](./cydWeeWX/README.md)
+* or, installing a prebuilt image through your browser using this [web based ESP32 flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html). 
+
+Then [install and configure](./WeeWX/README.md) the weewx-json extension on your WeeWX server.
+
+When cydWeeWX is booted for the first time the WiFI access and the WeeWX server URL will need to be configured. The cydWeeWX display should look as shown:
 
 <p align="center">
   <img src="./images/apConfigMessage.jpg" />
@@ -53,9 +59,11 @@ With a phone, tablet or PC, connect to the cydWeeWX access point at the indicate
 2. Click **Save** to save the WeeWX URL and hit the browser back button to return to the Configuration Portal main page.
 3. Now click **Configure WiFi** to go to the WiFi configuration page.
 4. Enter the _SSID_ and _Password_ for you WiFI network then click **Save**.
-5. At this point the cydWeeWX will attempt to connect to your WiFi network and then display your current weather data.
+5. At this point cydWeeWX will attempt to connect to your WiFi network and then display your current weather data.
 
-If there is a problem with the WiFi connection, access to the WeeWX server or access to Open-Meteo the cydWeeWX will enter an error state and display an error message.
+If there is a problem with the WiFi connection or access to the WeeWX server cydWeeWX will enter a critical error state and display an error message in the header. After 5 minutes cydWeeWX will reboot hoping to clear the problem. A countdown will be shown in the weather descriptor.
+
+If there is a problem retrieving Open-Meteo data then cydWeeWX will enter a non-critical error state. WeeWX weather data will continue to update but the Weather Icon and Weather Descriptor will show the Open-Meteo error. Open-Meteo queries will continue to be made every 5 minutes.
 
 <p align="center">
   <img src="./images/cydWeeWXError.gif" />
@@ -63,7 +71,7 @@ If there is a problem with the WiFi connection, access to the WeeWX server or ac
 
 ## Triggering the Configuration Portal
 
-The cydWeeWX can be forced to re-enter Configuration Portal mode by holding down the configuration trigger button. cydWeeWX uses the **BOOT** button on the CYD as the trigger button. Its on the back of the CYD next to the **RESET** button
+The cydWeeWX can be forced to re-enter Configuration Portal mode by holding down the configuration trigger button. cydWeeWX uses the **BOOT** button on the CYD as the trigger button. See image below. Its on the back of the CYD next to the **RESET** button.  Pressing the **RESET** button will cause cydWeeWX to reboot.
 
 <p align="center">
   <img src="./images/esp32cydBack.jpg" />
@@ -77,16 +85,28 @@ The **BOOT** button needs to be held down for at least 2 seconds to enter Config
 
 Follow the [Configuration Steps](#configuration-steps) above to fix either the WiFI configuration or WeeWX URL. If the error is with access to Open-Meteo then you may have an internet access issue.
 
-The Configuration Portal will timeout after 5 minutes. If WiFi connectivity has not been established after the timeout then the cydWeeWX will reboot. If there is a WiFi connection established then the cydWeeWX will enter weather data display mode. Either clicking on the **EXIT** button in the portal or holding down the **BOOT** button will force the cydWeeWX to exit configuration mode.
+The Configuration Portal will timeout after 5 minutes. If WiFi connectivity has not been established after the timeout then cydWeeWX will reboot. If there is a WiFi connection established then cydWeeWX will enter weather data display mode. Either clicking on the **EXIT** button in the portal or holding down the **BOOT** button will force cydWeeWX to exit configuration mode.
+
+<u>**IMPORTANT:**</u> If you change the value of the WeeWX URL in the Setup page, click **Save**, then use the browser back arrow to return to the main Configuration Portal page. You **MUST** then select **Exit** to shut down the portal or your changes will NOT be saved.
+
+## cydWeeWX Case
+
+<p align="center">
+  <img src="./images/cydWeeWXcase.jpg" />
+</p>
+
+This is a simple 3D printed case designed for the cydWeeWX. The 90 degree angle USB C adapter shown in the lower left of the picture is required to route the USB cable to the back of the case. Four M3x12mm button head screws are required to hold the back on.
+
+Both STL and STEP files for the case can be found in the [cydWeeWX Case](./cydWeeWX%20Case/) folder.
 
 ## WOKWi Simulation
 
-The display images shown above were generated using a [WOKWi](https://wokwi.com) simulation of the cydWeeWX. The firmware is too large to use directly on the WOKWi web site but it will run using the VS Code plugin. How to set up the VS Code plugin can be found on the [WOKWi](https://docs.wokwi.com/vscode/getting-started) site. Information about how to build cydWeeWX firmware for simulation can be found [here](./WOKWi/README.md).
+The display images shown above were generated using a [WOKWi](https://wokwi.com) simulation of cydWeeWX. The firmware is too large to use directly on the WOKWi web site but it will run using the VS Code plugin. How to set up the VS Code plugin can be found on the [WOKWi](https://docs.wokwi.com/vscode/getting-started) site. Information about how to build cydWeeWX firmware for simulation can be found [here](./WOKWi/README.md).
 
 ## Third Party Acknowledgements
 
 * Brian Lough's [ESP32-Cheap-Yellow-Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/tree/main) site. A great place to go for information on the CYD.
 * [WeeWX](https://www.weewx.com/) open source software for your weather station.
-* Erik Flowers' [Weather Icons](https://erikflowers.github.io/weather-icons/) site. The icons used in the cydWeeWX are LVGL fonts derived from the Weather Icons TTF font created by Erik Flowers. The [weatherIcons_22c.h](./cydWeeWX/weatherIcons_22c.h) and [wmoIcons_64c.h](./cydWeeWX/wmoIcons_64c.h) font files we're produced from the Weather Icons TTF font using the [LVGL Font Converter](https://lvgl.io/tools/fontconverter).
+* Erik Flowers' [Weather Icons](https://erikflowers.github.io/weather-icons/) site. The icons used in cydWeeWX are LVGL fonts derived from the Weather Icons TTF font created by Erik Flowers. The [weatherIcons_22c.h](./cydWeeWX/weatherIcons_22c.h) and [wmoIcons_64c.h](./cydWeeWX/wmoIcons_64c.h) font files we're produced from the Weather Icons TTF font using the [LVGL Font Converter](https://lvgl.io/tools/fontconverter).
 * [DejaVu Fonts](https://dejavu-fonts.github.io/) used to produce the [dejaVuSansCondensed_18c.h](./cydWeeWX/dejaVuSansCondensed_18c.h) font file with the [LVGL Font Converter](https://lvgl.io/tools/fontconverter).
-
+* Web based flash tool provided by [ESP Web Tools](https://esphome.github.io/esp-web-tools/).

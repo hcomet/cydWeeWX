@@ -5,11 +5,11 @@
 1. Install the Arduino IDE.  
   <u>**NOTE:**</u>  Use of the latest 2.x version of the IDE is recommended since builds have only been verified with that version of the IDE.
 2. Add support for ESP32 modules using the _Boards Manager_ in the Arduino IDE.  
-    * Install the boards plugin for esp32 by Espressif Systems version 3.x.
-3. The CYD uses an ESP32-WROOM and any if the basic boards definitions should work. I've used _ESP32-WROOM-DA Module_ and _ESP32 Dev Module_ without issue.
+    * Install the boards plugin for esp32 by Espressif Systems version 3.x. Tested with Arduino core for ESP32 v3.1.1.
+3. The CYD uses an ESP32-WROOM and any of the basic boards definitions should work. I've used _ESP32-WROOM-DA Module_ and _ESP32 Dev Module_ without issue.
 4. The cydWeeWX uses [LVGL](https://lvgl.io/) which makes builds quite large. Make sure to select a **Partition Scheme** of _Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFS)_.
 5. Install the following Arduino libraries if not already installed:
-   * [ArduinoJson by Benoit Blanchon](https://arduinojson.org/) - Version: 7.2.1
+   * [ArduinoJson by Benoit Blanchon](https://arduinojson.org/) - Version: 7.3.0
    * [TaskScheduler by Anatoli Arkhipenko](https://github.com/arkhipenko/TaskScheduler) - Version: 3.8.5
    * [WiFiManager by tzapu](https://github.com/tzapu/WiFiManager) - Version 2.0.17
    * [lvgl by kisvegabor](https://github.com/lvgl/lvgl) - Version 9.2.2
@@ -40,7 +40,7 @@ The cydWeeWX firmware may be built without any changes to the default settings i
     #define CYD_WWX_BL_BRIGHTNESS 100
     ```  
     
-  * By default the cydWeeWX will concatenate a 4 digit random value to the end of the Access Point base password resulting in _cydWeeWx####_. This is done on each boot of the device. Commenting out this line will prevent the random value concatenation resulting in same password being used all the time.  
+  * By default cydWeeWX will concatenate a 4 digit random value to the end of the Access Point base password resulting in _cydWeeWx####_. This is done on each boot of the device. Commenting out this line will prevent the random value concatenation resulting in same password being used all the time.  
   
     ```c
     #define WIFI_MANAGER_ENABLE_PASSWORD_RANDOM
