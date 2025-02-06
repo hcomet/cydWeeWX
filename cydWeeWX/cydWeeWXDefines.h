@@ -76,7 +76,7 @@
 #define CYD_WWX_BL_BRIGHTNESS 100                   // Default Backlight brightness (out of 255)
 #define CYD_WWX_BL_MAX_BRIGHTNESS 255               // Maximum brightness value (out of 255)
 #define CYD_WWX_BL_MIN_BRIGHTNESS 60                // Minimum brightness value (out of 255)
-// Note: LDR values go to 4096
+// Note: LDR values go to 4096 with lower values representing brighter ambient lighting
 #define CYD_WWX_BL_LOW_THRESHOLD  100               // Low LDR reading threshold to set to Max brightness
 #define CYD_WWX_BL_HIGH_THRESHOLD  1000             // High LDR reading threshold to set to Min brightness
 #endif // TFT_BL
