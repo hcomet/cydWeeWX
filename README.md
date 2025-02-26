@@ -94,7 +94,7 @@ The Configuration Portal will timeout after 5 minutes. If WiFi connectivity has 
 ## cydWeeWX Case
 
 <p align="center">
-  <img src="./images/cydWeeWXcase.jpg" />
+  <img src="./images/cydWeeWXCase.jpg" />
 </p>
 
 This is a simple 3D printed case designed for the cydWeeWX. The 90 degree angle USB C adapter shown in the lower left of the picture is required to route the USB cable to the back of the case. Four M3x12mm button head screws are required to hold the back on.
