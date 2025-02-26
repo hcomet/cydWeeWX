@@ -1,5 +1,5 @@
 # cydWeeWX
-Simple WeeWX Weather Station Display for the Cheap Yellow Display [(CYD)](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display).
+Simple [WeeWX](https://www.weewx.com/) Weather Station Display for the Cheap Yellow Display [(CYD)](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display).
 
 <p align="center">
   <img src="./images/cydWeeWX.gif" />
@@ -33,13 +33,15 @@ WMO icon and icon colors will change based in whether it is currently night or d
 
 The cydWeeWX device makes use of the Arduino [WiFi Manager](https://github.com/tzapu/WiFiManager) library to implement a Configuration Portal. The Configuration Portal allows you to set up the WiFi configuration as well as the URL for your WeeWX server.
 
-## Configuration
+## Installation
 
-Install the cydWeeWX firmware on you CYD by either:
+Install the cydWeeWX firmware on your CYD by either:
 * building and uploading the firmware yourself using the [build instructions](./cydWeeWX/README.md)
 * or, installing a prebuilt image through your browser using this [web based ESP32 flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html). 
 
 Then [install and configure](./WeeWX/README.md) the weewx-json extension on your WeeWX server.
+
+## Configuration
 
 When cydWeeWX is booted for the first time the WiFI access and the WeeWX server URL will need to be configured. The cydWeeWX display should look as shown:
 
