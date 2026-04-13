@@ -76,9 +76,15 @@
 #define CYD_WWX_BL_BRIGHTNESS 100                   // Default Backlight brightness (out of 255)
 #define CYD_WWX_BL_MAX_BRIGHTNESS 255               // Maximum brightness value (out of 255)
 #define CYD_WWX_BL_MIN_BRIGHTNESS 60                // Minimum brightness value (out of 255)
-// Note: LDR values go to 4096 with lower values representing brighter ambient lighting
-#define CYD_WWX_BL_LOW_THRESHOLD  100               // Low LDR reading threshold to set to Max brightness
-#define CYD_WWX_BL_HIGH_THRESHOLD  1000             // High LDR reading threshold to set to Min brightness
+#define CYD_WWX_DEFAULT_DIMMER_MODE 1               // Default backlight dimmer mode (0=None, 1=Auto, 2=Scheduled, 3=Sunrise/Sunset)
+#define CYD_WWX_DIMMER_START_HOUR 20                // Default dimmer start hour for scheduled dimming mode (24 hour format)
+#define CYD_WWX_DIMMER_START_MINUTE 0               // Default dimmer start minute for scheduled dimming mode
+#define CYD_WWX_DIMMER_END_HOUR 6                   // Default dimmer end hour for scheduled dimming mode (24 hour format)
+#define CYD_WWX_DIMMER_END_MINUTE 0                 // Default dimmer end minute for scheduled dimming mode
+#define CYD_WWX_RISE_SET_OFFSET 30                  // Default sunrise/sunset offset (0, 30, 60) before sunrise and after sunset in minutes
+// Note: LDR values go to 4095 with lower values representing brighter ambient lighting
+#define CYD_WWX_LDR_LOW_THRESHOLD  100               // Low LDR reading threshold to set to Max brightness
+#define CYD_WWX_LDR_HIGH_THRESHOLD  1000             // High LDR reading threshold to set to Min brightness
 #endif // TFT_BL
 
 // **************************************************************************************************
@@ -111,7 +117,17 @@
 // WeeWX URL Stored in EEPROM Preferences
 // **************************************************************************************************
 #define CYD_WWX_PREFERENCES_NAMESPACE "cydWeeWX"    // Preferences Namespace
-#define CYD_WWX_PREFERENCES_KEY "WEEWX_JSON_URL"    // Preferences Key name
+#define CYD_WWX_PREF_KEY_URL "WEEWX_JSON_URL"    // Preferences Key name
+#define CYD_WWX_PREF_KEY_DIMMER_MODE "MODE"    // Preferences Key name for dimmer mode
+#define CYD_WWX_PREF_KEY_DIMMER_START_HOUR "START_HR"    // Preferences Key name for dimmer start hour
+#define CYD_WWX_PREF_KEY_DIMMER_START_MINUTE "START_MIN"    // Preferences Key name for dimmer start minute
+#define CYD_WWX_PREF_KEY_DIMMER_END_HOUR "END_HR"    // Preferences Key name for dimmer end hour
+#define CYD_WWX_PREF_KEY_DIMMER_END_MINUTE "END_MIN"    // Preferences Key name for dimmer end minute
+#define CYD_WWX_PREF_KEY_RISE_SET_OFFSET "RS_OFFSET"    // Preferences Key name for sunrise/sunset offset
+#define CYD_WWX_PREF_KEY_LDR_LOW_THRESHOLD "LOW_TH"    // Preferences Key name for LDR low threshold
+#define CYD_WWX_PREF_KEY_LDR_HIGH_THRESHOLD "HI_TH"    // Preferences Key name for LDR high threshold
+#define CYD_WWX_PREF_KEY_MAX_BRIGHTNESS "MAX_BL"    // Preferences Key name for max brightness
+#define CYD_WWX_PREF_KEY_MIN_BRIGHTNESS "MIN_BL"    // Preferences Key name for dim brightness
 #define CYD_WWX_PREFERENCES_RW false                // Open Preferences Read/Write
 #define CYD_WWX_PREFERENCES_RO true                 // Open Preferences Read Only
 

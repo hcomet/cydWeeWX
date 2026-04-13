@@ -57,8 +57,8 @@ The cydWeeWX firmware may be built without any changes to the default settings i
     #define CYD_WWX_BL_MAX_BRIGHTNESS 255               // Maximum brightness value (out of 255)
     #define CYD_WWX_BL_MIN_BRIGHTNESS 60                // Minimum brightness value (out of 255)
     // Note: LDR values go to 4096 with lower values representing brighter ambient lighting
-    #define CYD_WWX_BL_LOW_THRESHOLD  100               // Low LDR reading threshold to set to Max brightness
-    #define CYD_WWX_BL_HIGH_THRESHOLD  1000             // High LDR reading threshold to set to Min brightness
+    #define CYD_WWX_LDR_LOW_THRESHOLD  100               // Low LDR reading threshold to set to Max brightness
+    #define CYD_WWX_LDR_HIGH_THRESHOLD  1000             // High LDR reading threshold to set to Min brightness
     #endif // TFT_BL
     ```
     The LDR(Light Dependent Resistor) is used to sense the ambient light and then adjust the LCD backlight to be stronger in brighter conditions.
