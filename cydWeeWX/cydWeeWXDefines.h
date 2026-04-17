@@ -77,7 +77,7 @@
 #define CYD_WWX_BL_MAX_BRIGHTNESS 255               // Maximum brightness value (out of 255)
 #define CYD_WWX_BL_MIN_BRIGHTNESS 60                // Minimum brightness value (out of 255)
 #define CYD_WWX_DEFAULT_DIMMER_MODE 1               // Default backlight dimmer mode (0=None, 1=Auto, 2=Scheduled, 3=Sunrise/Sunset)
-#define CYD_WWX_DIMMER_START_HOUR 20                // Default dimmer start hour for scheduled dimming mode (24 hour format)
+#define CYD_WWX_DIMMER_START_HOUR 22                // Default dimmer start hour for scheduled dimming mode (24 hour format)
 #define CYD_WWX_DIMMER_START_MINUTE 0               // Default dimmer start minute for scheduled dimming mode
 #define CYD_WWX_DIMMER_END_HOUR 6                   // Default dimmer end hour for scheduled dimming mode (24 hour format)
 #define CYD_WWX_DIMMER_END_MINUTE 0                 // Default dimmer end minute for scheduled dimming mode
