@@ -155,9 +155,13 @@
 //#define CYD_WWX_RUN_ON_WOKWI                      // Uncomment to build for WOKWi simulation
 //#define CYD_WWX_WOKWI_ENTER_AP_AT_BOOT            // Uncomment to force AP entry at boot
 //#define CYD_WWX_WOKWI_SHOW_ERROR_STATE            // Uncomment to enter error state on Config Portal exit
-#define CYD_WWX_WOKWI_TRIGGER_PIN 26                // Trigger Pin as defined in the diagram.json
+#define CYD_WWX_WOKWI_TRIGGER_PIN 22                // Trigger Pin as defined in the diagram.json
 #define CYD_WWX_WOKWI_AP_SSID "Wokwi-GUEST"         // WOKWi WiFi open access point SSID
 #define CYD_WWX_WOKWI_AP_PASSWORD ""                // WOKWi WiFi open access point Password
+#ifdef CYD_WWX_RUN_ON_WOKWI
+#undef CYD_WWX_LDR_PIN
+#define TFT_BL
+#endif // CYD_WWX_RUN_ON_WOKWI
 
 // **************************************************************************************************
 // Logging Macros

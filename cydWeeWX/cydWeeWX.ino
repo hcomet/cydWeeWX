@@ -280,6 +280,7 @@ lv_display_t * cydWeeWXDisp;
 enum class displayname {
       WEEWX_MAIN = 0,
       WIFI_MANAGER_MAIN,
+      BOOT_SCREEN,
       MAX_DISPLAYNAME_TYPES
 };
 displayname currentActiveDisplay = displayname::MAX_DISPLAYNAME_TYPES;  // used as no active display
@@ -301,6 +302,7 @@ static lv_style_t gridStyle;
 static lv_style_t cellStyle;
 
 // LGVL Label Text Values
+static lv_obj_t * textLabelBootMessage;
 static lv_obj_t * textLabelWifiManagerMessage;
 static lv_obj_t * textLabelWifiManagerTimer;
 static lv_obj_t * textLabelWeatherDescription;
@@ -600,8 +602,8 @@ void wifiConfigCB() {
 //
 void displayCleanup( void )
 {
+  lv_style_reset( &displayStyle );
   if (currentActiveDisplay == displayname::WEEWX_MAIN ) {
-    lv_style_reset( &displayStyle );
     lv_style_reset( &myDayStyle );
     lv_style_reset( &myNightStyle );
     lv_style_reset( &gridStyle );
@@ -628,9 +630,10 @@ void displayReInit( displayname whichDisplay )
   tLvglHandler.enable();
 
   // Initialize the TFT display using the TFT_eSPI library
+  memset(draw_buf, 0x00, sizeof(draw_buf));
   cydWeeWXDisp = lv_tft_espi_create(CYD_WWX_SCREEN_WIDTH, CYD_WWX_SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
   lv_display_set_rotation(cydWeeWXDisp, LV_DISPLAY_ROTATION_90);
-
+  lv_refr_now( cydWeeWXDisp );
   if (whichDisplay == displayname::WEEWX_MAIN) {
       tWeeWXUpdate.enable();
       tOpenMeteoUpdate.enable();
@@ -661,7 +664,8 @@ void setSensorTrend( float trend, cydwwxsensor type) {
   String trendString = String();
   unsigned int limitIndex = (unsigned int)type;
 
-  LOG_DEBUG("setSensorTrend", "Sensor <" << type << "> trend: " << trend << " vs " << trendLimitsForSensors[limitIndex].lowLimit << " to " << trendLimitsForSensors[limitIndex].highLimit);
+  LOG_DEBUG("setSensorTrend", "Sensor <" << (int)type << "> trend: " << trend << " vs " << trendLimitsForSensors[limitIndex].lowLimit << " to " 
+    << trendLimitsForSensors[limitIndex].highLimit);
   
   if (abs(trend) >= trendLimitsForSensors[limitIndex].highLimit) {
     if (trend >= 0) {
@@ -718,91 +722,131 @@ uint32_t cydWeeWXTickCB() {
 static void timer_cb(lv_timer_t * timer) {
   LV_UNUSED(timer);
 
-  if (currentActiveDisplay == displayname::WEEWX_MAIN) {
-    if (isDay)
+  switch (currentActiveDisplay) 
+  {
+    case displayname::WEEWX_MAIN:
     {
-      lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
-      lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
-      lv_obj_add_style(weatherIconBox, &myDayStyle, 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
-    }
-    else
-    {
-      lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
-      lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
-      lv_obj_add_style(weatherIconBox, &myNightStyle, 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
-    }
+      if (isDay)
+      {
+        lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
+        lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
+        lv_obj_add_style(weatherIconBox, &myDayStyle, 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
+      }
+      else
+      {
+        lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
+        lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
+        lv_obj_add_style(weatherIconBox, &myNightStyle, 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
+      }
 
-    if (cydWeeWXErrorState == CYD_WWX_CRITICAL_ERROR) {
-      // If critical then will reboot every 3 minutes, show error in header and reboot timer in weather description
-      setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelWeatherDescription, String("Error state. Reboot in: " + String(CYD_WWX_ERROR_WAIT_TO_REBOOT-cydWeeWXErrorStateTimer) + " seconds.").c_str());
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelScreenHeader, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelScreenHeader, errorHeaderMessage.c_str());
-    } else if (cydWeeWXErrorState == CYD_WWX_NON_CRITICAL_ERROR) {
-      // If non-crititcal then just show error in the weather description
-      setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelWeatherDescription, errorHeaderMessage.c_str()); 
-      lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
-    } else {
-      setWmoIconAndDescription(weatherCode);
-      lv_label_set_text(textLabelWeatherDescription, weatherDescription.c_str());
-      lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
-    }
-    
-    lv_label_set_text(textLabelTemperature, temperature.c_str());
-    lv_label_set_text(textLabelTrendTemperature, trendTemperature.c_str());
-    lv_label_set_text(textLabelInsideTemperature, insideTemperature.c_str());
-    lv_label_set_text(textLabelUnitsTemperature, unitsTemperature.c_str());
-    lv_label_set_text(textLabelHumidity, humidity.c_str());
-    lv_label_set_text(textLabelTrendHumidity, trendHumidity.c_str());
-    lv_label_set_text(textLabelInsideHumidity, insideHumidity.c_str());
-    lv_label_set_text(textLabelUnitsHumidity, unitsHumidity.c_str());
-    whichReadingsToShow = !whichReadingsToShow;
-    if (whichReadingsToShow) {
-      lv_label_set_text(textLabelReadingsGrid31, iconWind.c_str());
-      lv_label_set_text(textLabelReadingsGrid32, wind.c_str());
-      lv_label_set_text(textLabelReadingsGrid33, trendWind.c_str());
-      lv_label_set_text(textLabelReadingsGrid34, unitsWind.c_str());
-      lv_label_set_text(textLabelReadingsGrid35, windDirection.c_str());
-      lv_label_set_text(textLabelReadingsGrid41, iconWindGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid42, windGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid43, trendWindGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid44, unitsWindGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid45, windGustDirection.c_str());
-    } else {
+      if (cydWeeWXErrorState == CYD_WWX_CRITICAL_ERROR) {
+        // If critical then will reboot every 3 minutes, show error in header and reboot timer in weather description
+        setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
+        lv_label_set_text(textLabelWeatherDescription, String("Error state. Reboot in: " + String(CYD_WWX_ERROR_WAIT_TO_REBOOT-cydWeeWXErrorStateTimer) + " seconds.").c_str());
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelScreenHeader, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
+        lv_label_set_text(textLabelScreenHeader, errorHeaderMessage.c_str());
+      } else if (cydWeeWXErrorState == CYD_WWX_NON_CRITICAL_ERROR) {
+        // If non-crititcal then just show error in the weather description
+        setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
+        lv_label_set_text(textLabelWeatherDescription, errorHeaderMessage.c_str()); 
+        lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
+      } else {
+        setWmoIconAndDescription(weatherCode);
+        lv_label_set_text(textLabelWeatherDescription, weatherDescription.c_str());
+        lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
+      }
       
-      lv_label_set_text(textLabelReadingsGrid31, iconPressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid32, pressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid33, trendPressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid34, unitsPressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid35, "");
-      lv_label_set_text(textLabelReadingsGrid41, iconRainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid42, rainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid43, trendRainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid44, unitsRainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid45, "");
+      lv_label_set_text(textLabelTemperature, temperature.c_str());
+      lv_label_set_text(textLabelTrendTemperature, trendTemperature.c_str());
+      lv_label_set_text(textLabelInsideTemperature, insideTemperature.c_str());
+      lv_label_set_text(textLabelUnitsTemperature, unitsTemperature.c_str());
+      lv_label_set_text(textLabelHumidity, humidity.c_str());
+      lv_label_set_text(textLabelTrendHumidity, trendHumidity.c_str());
+      lv_label_set_text(textLabelInsideHumidity, insideHumidity.c_str());
+      lv_label_set_text(textLabelUnitsHumidity, unitsHumidity.c_str());
+      whichReadingsToShow = !whichReadingsToShow;
+      if (whichReadingsToShow) {
+        lv_label_set_text(textLabelReadingsGrid31, iconWind.c_str());
+        lv_label_set_text(textLabelReadingsGrid32, wind.c_str());
+        lv_label_set_text(textLabelReadingsGrid33, trendWind.c_str());
+        lv_label_set_text(textLabelReadingsGrid34, unitsWind.c_str());
+        lv_label_set_text(textLabelReadingsGrid35, windDirection.c_str());
+        lv_label_set_text(textLabelReadingsGrid41, iconWindGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid42, windGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid43, trendWindGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid44, unitsWindGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid45, windGustDirection.c_str());
+      } else {
+        
+        lv_label_set_text(textLabelReadingsGrid31, iconPressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid32, pressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid33, trendPressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid34, unitsPressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid35, "");
+        lv_label_set_text(textLabelReadingsGrid41, iconRainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid42, rainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid43, trendRainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid44, unitsRainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid45, "");
+      }
+      lv_label_set_text(textLabelSunrise, sunrise.c_str());
+      lv_label_set_text(textLabelSunset, sunset.c_str());
+      lv_label_set_text(textLabelMoonrise, moonrise.c_str());
+      lv_label_set_text(textLabelMoonset, moonset.c_str());
+      lv_label_set_text(textLabelMoonPhase, moonPhase.c_str());
+      lv_label_set_text(textLabelIconMoonPhase, iconMoonPhase.c_str());
+      break;
     }
-    lv_label_set_text(textLabelSunrise, sunrise.c_str());
-    lv_label_set_text(textLabelSunset, sunset.c_str());
-    lv_label_set_text(textLabelMoonrise, moonrise.c_str());
-    lv_label_set_text(textLabelMoonset, moonset.c_str());
-    lv_label_set_text(textLabelMoonPhase, moonPhase.c_str());
-    lv_label_set_text(textLabelIconMoonPhase, iconMoonPhase.c_str());
-
-  } else if (currentActiveDisplay == displayname::WIFI_MANAGER_MAIN) {
-    setWifiMessage();
-    lv_label_set_text(textLabelWifiManagerTimer, wifiManagerTimer.c_str());
-  } else {
-    LOG_ERROR("timer_cb", "No current display defined.");
+    case displayname::WIFI_MANAGER_MAIN:
+    {
+      setWifiMessage();
+      lv_label_set_text(textLabelWifiManagerTimer, wifiManagerTimer.c_str());
+      break;
+    }
+    case displayname::BOOT_SCREEN:
+    {
+      break;
+    }
+    default:
+    {
+      LOG_ERROR("timer_cb", "No current display defined.");
+      break;
+    }
   }
+}
+
+// Create cydWeeWX GUI when booting
+void createBootGui(void) {
+
+  currentActiveDisplay = displayname::BOOT_SCREEN;
+  
+  lv_obj_set_scrollbar_mode(lv_screen_active(), LV_SCROLLBAR_MODE_OFF);
+  lv_style_reset(&displayStyle);
+  lv_style_init(&displayStyle);
+  lv_style_set_bg_color(&displayStyle, lv_color_hex(CYD_WWX_WIFI_MANAGER_BG_COLOR)); 
+  lv_obj_add_style(lv_screen_active(), &displayStyle, 0);
+
+  textLabelBootMessage = lv_label_create(lv_screen_active());
+  lv_label_set_text(textLabelBootMessage, "Booting... Please wait.");
+  lv_obj_align(textLabelBootMessage, LV_ALIGN_CENTER, 0, -20);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelBootMessage, &lv_font_montserrat_16, 0);
+  lv_label_set_long_mode(textLabelBootMessage, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_color((lv_obj_t*) textLabelBootMessage, lv_color_hex(CYD_WWX_WIFI_MANAGER_TEXT_COLOR), 0);
+  lv_obj_set_width(textLabelBootMessage, 320);
+  lv_obj_set_style_text_align(textLabelBootMessage, LV_TEXT_ALIGN_CENTER, 0);
+  
+  lv_refr_now( cydWeeWXDisp );
+  lv_timer_t * timer = lv_timer_create(timer_cb, CYD_WWX_WEEWX_LV_TIMER, NULL);
+  lv_timer_ready(timer);
 
 }
+
 
 // Create cydWeeWX GUI when in configuration portal mode
 void createMainWifiManagerGui(void) {
@@ -1785,14 +1829,6 @@ void loadCydWeeWXConfig() {
 
   cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RO);
 
-  //if (!cydWeeWXPreference.isKey(CYD_WWX_PREF_KEY_URL)) {
-  //  cydWeeWXPreference.end();
-  //  cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RW);
-  //  cydWeeWXPreference.putString(CYD_WWX_PREF_KEY_URL, cydWeeWXUrl);
-  //  cydWeeWXPreference.end();
-  //  cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RO); 
-  //}
-
   cydWeeWXUrl = cydWeeWXPreference.getString(CYD_WWX_PREF_KEY_URL, cydWeeWXUrl);
   LOG_INFO("loadCydWeeWxConfig", "Load config from preferences (WeeWX URL): " << cydWeeWXUrl.c_str());
 
@@ -1908,6 +1944,9 @@ void setup() {
   Serial.begin(115200);
   delay(3000);
   Serial.setDebugOutput(true); 
+  #ifdef CYD_WWX_RUN_ON_WOKWI
+  LOG_INFO("setup", "Starting cydWeeWX built for wokwi simulation.");
+  #endif // CYD_WWX_RUN_ON_WOKWI
   LOG_INFO("setup", "Starting " << String(programName) << " Version: " << String(programVersion) << " Board Type: " << CYD_WWX_BOARD_TYPE); 
   LOG_INFO("setup", "Starting " << LVGL_Arduino);
 
@@ -1918,8 +1957,11 @@ void setup() {
   lv_tick_set_cb(cydWeeWXTickCB);
 
   // Initialize the TFT display using the TFT_eSPI library
+  memset(draw_buf, 0x00, sizeof(draw_buf));
   cydWeeWXDisp = lv_tft_espi_create(CYD_WWX_SCREEN_WIDTH, CYD_WWX_SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
   lv_display_set_rotation(cydWeeWXDisp, CYD_WWX_ROTATE_SCREEN);
+  createBootGui();
+  lv_refr_now( NULL );
 
   // Set up Task Scheduler
   cydScheduler.init();
@@ -2038,22 +2080,11 @@ void setup() {
  
 
   if (WiFi.status() == WL_CONNECTED) {
-    LOG_INFO("setup", "Create main cydWeeWX display and update.");
-    
-    createMainWeeWXGui();
-    getWeeWXData();
-    getOpenMeteoData();
-    
-    tWeeWXUpdate.enable();
-    tOpenMeteoUpdate.enable();
-
+    LOG_INFO("setup", "Create main cydWeeWX display and update.");    
+    displayReInit(displayname::WEEWX_MAIN);
   } else {
     LOG_INFO("setup", "Wifi is NOT connected.");
-    setWifiMessage();
-    createMainWifiManagerGui();
-
-    tProcessWifiManager.enable();
-    tTimerWifiManager.enable();
+    displayReInit(displayname::WIFI_MANAGER_MAIN);
   }
 
   tCydWeeWXTriggerPin.enable();

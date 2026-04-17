@@ -1,0 +1,3 @@
+    [wokwi]
+        firmware = '(relative path to build folder)/cydWeeWX.ino.merged.bin'
+        elf = '(relative path to build folder)/cydWeeWX.ino.elf'
