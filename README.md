@@ -35,9 +35,10 @@ The cydWeeWX device makes use of the Arduino [WiFi Manager](https://github.com/t
 
 ## Installation
 
-Install the cydWeeWX firmware on your CYD by either:
-* building and uploading the firmware yourself using the [build instructions](./cydWeeWX/README.md)
-* or, installing a prebuilt image through your browser using this [web based ESP32 flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html). 
+Installing the cydWeeWX firmware on your CYD:
+
+* Got to [Upgrading cydWeeWX Firmware](./cydWeeWX/README.md#upgrading-cydweewx-firmware) for upgrade details.
+* Got to [Firmware Installation](./cydWeeWX/README.md#firmware-installation) for installation and build details. Both using the [web based ESP32 flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html) and building from source code are covered.
 
 Then [install and configure](./WeeWX/README.md) the weewx-json extension on your WeeWX server.
 
@@ -62,7 +63,7 @@ With a phone, tablet or PC, connect to the cydWeeWX access point at the indicate
   the Configuration Portal after configuring up your WiFi. Details on how to re-enter the Configuration Portal as well as the additional parameters is covered [below](#triggering-the-configuration-portal).
 2. Click **Save** to save the WeeWX URL and hit the browser back button to return to the Configuration Portal main page.
 3. Now click **Configure WiFi** to go to the WiFi configuration page.
-4. Enter the _SSID_ and _Password_ for you WiFI network then click **Save**.
+4. Enter the _SSID_ and _Password_ for your WiFI network then click **Save**.
 5. At this point cydWeeWX will attempt to connect to your WiFi network and then display your current weather data.
 
 ## cydWeeWX Errors
@@ -92,6 +93,10 @@ The **BOOT** button needs to be held down for at least **2 seconds** to enter Co
 Connect to the Portal IP address with a browser to access the **Configuration Portal** to modify settings for the cydWeeWX.
 
 **NOTE:** The **Configuration Portal** will time out and close after 5 minutes. A countdown is shown on the cydWeeWX display. Also, holding down the **BOOT** button for 2 or more seconds will force cydWeeWX to exit configuration mode and close the **Configuration Portal**. If the portal closes due to time out or pressing the **BOOT** button, any changes made in the portal will **NOT** be saved. 
+
+## Configuration Portal
+
+The main **Configuration Portal** page presents several buttons to access pages to configure the cydWeeWX.
 
 ### Setup
 

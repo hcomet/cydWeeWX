@@ -1,23 +1,38 @@
-# How to Build and Install cydWeeWX
-## Option 1: Just install the Firmware
+# How to Install cydWeeWX Firmware
+
+## Upgrading cydWeeWX Firmware
+
+The cydWeeWX firmware is fully backward compatible making it easy to upgrade using one of 3 options:
+
+1. Use the web based firmware [flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html) to install the latest version cydWeeWX. When upgrading firmware **DO NOT** click the the ***Erase device*** checkbox when presented. Erasing the device before installation will delete previously saved settings.
+
+2. Download the latest firmware binary image and use [OTA update](../README.md#update) from the **[Configuration Portal](../README.md#configuration-portal)**. The latest firmware is available at the following links:
+   * CYD (original single USB): [firmware](https://hcomet.github.io/cydWeeWX/firmware/cydWeeWX_cyd.ino.bin)
+   * CYD2USB (newer dual USB): [firmware](https://hcomet.github.io/cydWeeWX/firmware/cydWeeWX_cyd2usb.ino.bin)
+
+3. Use the installation instructions in [Option 2](#option-2-build-it-yourself) below to build your own firmware binary and install it. Make sure to set ***Erase All Flash Before Sketch Upload*** to **Disabled** in the **Tools** menu. This will prevent your settings from being erased by the upload.
+
+## Firmware Installation
+
+### Option 1: Just install the Firmware
 
 If you have either an [original CYD or CYD2USB](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display?tab=readme-ov-file#how-do-i-know-if-a-display-is-a-cyd) then you can skip the hassle of setting up the Arduino IDE and building the firmware from source code. Use the web based firmware [flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html).
 
 If you do not have an original CYD or CYD2USB then you will likely need to go to option 2 and build the cydWeeWX from source code.
 
-## Option 2: Build it Yourself
+### Option 2: Build it Yourself
 
 1. Install the Arduino IDE.  
   <u>**NOTE:**</u>  Use of the latest 2.x version of the IDE is recommended since builds have only been verified with that version of the IDE.
 2. Add support for ESP32 modules using the _Boards Manager_ in the Arduino IDE.  
-    * Install the boards plugin for esp32 by Espressif Systems version 3.x. Tested with Arduino core for ESP32 v3.1.1.
+    * Install the boards plugin for esp32 by Espressif Systems version 3.x. Tested with Arduino core for ESP32 v3.3.8.
 3. The CYD uses an ESP32-WROOM and any of the basic boards definitions should work. I've used _ESP32-WROOM-DA Module_ and _ESP32 Dev Module_ without issue.
 4. The cydWeeWX uses [LVGL](https://lvgl.io/) which makes builds quite large. Make sure to select a **Partition Scheme** of _Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFS)_.
 5. Install the following Arduino libraries if not already installed:
-   * [ArduinoJson by Benoit Blanchon](https://arduinojson.org/) - Version: 7.3.0
-   * [TaskScheduler by Anatoli Arkhipenko](https://github.com/arkhipenko/TaskScheduler) - Version: 3.8.5
+   * [ArduinoJson by Benoit Blanchon](https://arduinojson.org/) - Version: 7.4.3
+   * [TaskScheduler by Anatoli Arkhipenko](https://github.com/arkhipenko/TaskScheduler) - Version: 4.0.5
    * [WiFiManager by tzapu](https://github.com/tzapu/WiFiManager) - Version 2.0.17
-   * [lvgl by kisvegabor](https://github.com/lvgl/lvgl) - Version 9.2.2
+   * [lvgl by kisvegabor](https://github.com/lvgl/lvgl) - Version 9.5.0
    * [TFT_eSPI by Bodmer](https://github.com/Bodmer/TFT_eSPI) - Version 2.5.43
 
    <u>**NOTE:**</u> If newer versions of a library are available then only use new subversions not new major versions.
@@ -25,7 +40,7 @@ If you do not have an original CYD or CYD2USB then you will likely need to go to
 6. Download the latest source code release from <https://github.com/hcomet/cydWeeWX/releases>  
   <u>**NOTE:**</u> After extracting the release to your file system open the ***cydWeeWX.ino*** file in the Arduino IDE. This will open the full set of source files in the IDE. Now configure the firmware before building it.
   
-### Configure Firmware in the ***cydWeeWXDefines.h*** file
+#### Configure Firmware in the ***cydWeeWXDefines.h*** file
 
 The cydWeeWX firmware may be built without any changes to the default settings in the ***cydWeeWXDefines.h*** file. However, there are a couple of customizations that may be made if needed.
 
@@ -56,7 +71,13 @@ The cydWeeWX firmware may be built without any changes to the default settings i
     #define CYD_WWX_BL_BRIGHTNESS 100                   // Default Backlight brightness (out of 255)
     #define CYD_WWX_BL_MAX_BRIGHTNESS 255               // Maximum brightness value (out of 255)
     #define CYD_WWX_BL_MIN_BRIGHTNESS 60                // Minimum brightness value (out of 255)
-    // Note: LDR values go to 4096 with lower values representing brighter ambient lighting
+    #define CYD_WWX_DEFAULT_DIMMER_MODE 1               // Default backlight dimmer mode (0=None, 1=Auto, 2=Scheduled, 3=Sunrise/Sunset)
+    #define CYD_WWX_DIMMER_START_HOUR 22                // Default dimmer start hour for scheduled dimming mode (24 hour format)
+    #define CYD_WWX_DIMMER_START_MINUTE 0               // Default dimmer start minute for scheduled dimming mode
+    #define CYD_WWX_DIMMER_END_HOUR 6                   // Default dimmer end hour for scheduled dimming mode (24 hour format)
+    #define CYD_WWX_DIMMER_END_MINUTE 0                 // Default dimmer end minute for scheduled dimming mode
+    #define CYD_WWX_RISE_SET_OFFSET 30                  // Default sunrise/sunset offset (0, 30, 60) before sunrise and after sunset in minutes
+    // Note: LDR values go to 4095 with lower values representing brighter ambient lighting
     #define CYD_WWX_LDR_LOW_THRESHOLD  100               // Low LDR reading threshold to set to Max brightness
     #define CYD_WWX_LDR_HIGH_THRESHOLD  1000             // High LDR reading threshold to set to Min brightness
     #endif // TFT_BL
@@ -76,22 +97,23 @@ The cydWeeWX firmware may be built without any changes to the default settings i
   #define CYD_WWX_WOKWI_AP_PASSWORD ""                // WOKWi WiFi open access point Password
   ```
   
-### TSP-eSPI ***User_Setup.h***
+#### TSP-eSPI ***User_Setup.h***
 
 A ***User_Setup.h*** file that matches your CYD must be placed in the Arduino TFT_eSPI library folder. Brian Lough's github [ESP32-Cheap-Yellow-Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) repository describes two basic versions that generally qualify as 'real' Cheap-Yellow-Displays. One is for CYD boards with a single USB port, [User_Setup.h](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/DisplayConfig/User_Setup.h). The second is for CYD boards with two USB ports (CYD2USB), [User_Setup.h](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/DisplayConfig/CYD2USB/User_Setup.h). Also be sure to read the general [CYD Setup](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/SETUP.md) instructions. 
 
-### LVGL ***lv_conf.h***
+#### LVGL ***lv_conf.h***
 
 The LVGL library needs a ***lv_conf.h*** file set up for your device. There is one included with the cydWeeWX source code, [lv_conf.h](./lv_conf.h). You can leave it in the sketch folder. If you already have one in your ***Arduino/libraries*** folder you may need to replace it with the cydWeeWX version of the file.
 
-## WeeWX-JSON Extension Installation
+### WeeWX-JSON Extension Installation
 
 The cydWeeWX device makes queries to your WeeWX server to pick up current weather data for your weather station. If you do not have a WeeWX server then please got to the [WeeWX web site](https://www.weewx.com/) to see how to download and install WeeWX. 
 
 The WeeWX server also needs to be configured to support weewx-json report generation. Follow these [instructions](../WeeWX/README.md) to complete the configuration.
 
-## Build and Run
+### Build and Run
 
-1. After completing the steps above, use the Arduino IDE to build and upload the firmware to your ESP32-CYD.
+1. After completing the steps above, use the Arduino IDE to build and upload the firmware to your ESP32-CYD.  
+**NOTE:** In the **Tools** menu set ***Erase All Flash Before Sketch Upload*** to **Enabled** for a new installation. Make sure it is set to **Disabled** for a firmware upgrade or re-install to prevent your settings from being erased.
 2. Follow these [steps](../README.md/#configuration-portal-steps) to set up your WiFi connection and WeeWX URL on the cydWeeWX device.
 3. Your ESP32-CYD should now be a working cydWeeWX.
