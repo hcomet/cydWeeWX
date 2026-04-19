@@ -37,8 +37,8 @@ The cydWeeWX device makes use of the Arduino [WiFi Manager](https://github.com/t
 
 Installing the cydWeeWX firmware on your CYD:
 
-* Got to [Upgrading cydWeeWX Firmware](./cydWeeWX/README.md#upgrading-cydweewx-firmware) for upgrade details.
-* Got to [Firmware Installation](./cydWeeWX/README.md#firmware-installation) for installation and build details. Both using the [web based ESP32 flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html) and building from source code are covered.
+* Go to [Upgrading cydWeeWX Firmware](./cydWeeWX/README.md#upgrading-cydweewx-firmware) for upgrade details.
+* Go to [Firmware Installation](./cydWeeWX/README.md#firmware-installation) for installation and build details. Both using the [web based ESP32 flash tool](https://hcomet.github.io/cydWeeWX/cydWeeWXFlash.html) and building from source code are covered.
 
 Then [install and configure](./WeeWX/README.md) the weewx-json extension on your WeeWX server.
 
@@ -50,7 +50,7 @@ When cydWeeWX is booted for the first time the WiFI access and the WeeWX server 
   <img src="./images/apConfigMessage.jpg" />
 </p>
 
-With a phone, tablet or PC, connect to the cydWeeWX access point at the indicated SSID with the indicated Password. The 4 digit value on the end of the password is randomly generated each time the cydWeeWX reboots. Once connected to the AP, use a browser to go to 194.168.4.1 to see the Configuration Portal main screen.
+With a phone, tablet or PC, connect to the cydWeeWX AP (Access Point) at the indicated SSID with the indicated Password. The 4 digit value on the end of the password is randomly generated each time the cydWeeWX reboots. Once connected to the AP, use a browser to go to 194.168.4.1 to see the **Configuration Portal** main screen.
 
 ### Configuration Portal Steps
 
@@ -58,23 +58,25 @@ With a phone, tablet or PC, connect to the cydWeeWX access point at the indicate
   <img src="./images/configuration.png" />
 </p>
 
-1. Click on the **Setup** button to go to a page where you can enter your WeeWX URL. The URL must start with "_HTTP://_" or "HTTPS//" and end with a slash, "_/_".  
+1. Click on the **Setup** button to go to a page where you can enter your WeeWX URL. The URL must start with "**http://**" or "**https://**" and end with a slash, "**/**".  
   You may also modify the additional **Setup** parameters at this time or re-enter
   the Configuration Portal after configuring up your WiFi. Details on how to re-enter the Configuration Portal as well as the additional parameters is covered [below](#triggering-the-configuration-portal).
 2. Click **Save** to save the WeeWX URL and hit the browser back button to return to the Configuration Portal main page.
 3. Now click **Configure WiFi** to go to the WiFi configuration page.
-4. Enter the _SSID_ and _Password_ for your WiFI network then click **Save**.
+4. Enter the ***SSID*** and ***Password*** for your WiFI network then click **Save**.
 5. At this point cydWeeWX will attempt to connect to your WiFi network and then display your current weather data.
 
 ## cydWeeWX Errors
 
-If there is a problem with the WiFi connection or access to the WeeWX server cydWeeWX will enter a critical error state and display an error message in the header. After 5 minutes cydWeeWX will reboot hoping to clear the problem. A countdown will be shown in the weather descriptor.
+If there is a problem with the WiFi connection or access to the WeeWX server cydWeeWX will enter a critical error state and display an error message in the header. A countdown will be shown in the Weather Icon Descriptor. After 5 minutes cydWeeWX will reboot hoping to clear the problem. If a WiFi connectivity issue continues, the cydWeeWX will enter AP mode with the **Configuration Portal** active and continue to reboot every 5 minutes.
 
 If there is a problem retrieving Open-Meteo data then cydWeeWX will enter a non-critical error state. WeeWX weather data will continue to update but the Weather Icon and Weather Descriptor will show the Open-Meteo error. Open-Meteo queries will continue to be made every 5 minutes.
 
 <p align="center">
   <img src="./images/cydWeeWXError.gif" />
 </p>
+
+If changes to the cydWeeWX configuration are required to clear errors, trigger the **Configuration Portal** as outlined below.
 
 ## Triggering the Configuration Portal
 
@@ -104,7 +106,13 @@ The **Setup** page allows for the configuration of several cydWeeWX parameters.
 
 #### WeeWX URL:
 
-* Sets the URL used by the cydWeeWX to query your WeeWX server. The URL must start with "_HTTP://_" or "HTTPS//" and end with a slash, "_/_".
+* Sets the URL used by the cydWeeWX to query your WeeWX server. The URL must start with "**http://**" or "**https://**" and end with a slash, "**/**".
+* To verify you have entered the correct value, copy the value to your web browser and append ***cyd_weewx.json*** to the end of it. If you can browse to the file successfully then the WeeWX URL is correct.
+
+#### cydWeeWX Hostname
+
+* Change the cydWeeWX Hostname from the default of **cydWeeWX**. Useful if you have more than one device on your network.  
+**NOTE:** Changing the hostname will also change the AP name for the device when it enters AP mode.
 
 #### Screen Max Brightness
 
@@ -116,7 +124,7 @@ The **Setup** page allows for the configuration of several cydWeeWX parameters.
 
 #### Choose Screen Dimmer Mode
 
-* Select which display screen dimming mode will be used by the cydWeeWX:
+* Select which display screen dimming mode will be used by the cydWeeWX. The default is **Auto Dimming**.
   * **No Dimming**: The display will always be at [Max Brightness](#screen-max-brightness) with no dimming.
   * **Auto Dimming**: Display brightness is controlled by the value read from the LDR (Light Dependent Resistor) on the CYD board. This allows for control of the display dimming based on how bright the light is around the cydWeeWX device. The display is set to [Max Brightness](#screen-max-brightness) when the LDR reads a value below the [Light Sensor Low Threshold](#light-sensor-low-bright-threshold-0-4095). The display is set to [Min Brightness](#screen-min-brightness) when the LDR reads a value above [Light Sensor High Threshold](#light-sensor-high-dark-threshold-0-4095). LDR values between the sensor high and low thresholds will generate a proportional display brightness between the Min and Max brightness values.
   * **Scheduled Dimming**: The display is set to [Max Brightness](#screen-max-brightness) except when the local time is between [Dimmer Start Time](#dimmer-start-time-hhmm) and [Dimmer End Time](#dimmer-end-time-hhmm) when it is set to [Min Brightness](#screen-min-brightness). Local time is determined from the WeeWX weather data query.
@@ -132,15 +140,15 @@ The **Setup** page allows for the configuration of several cydWeeWX parameters.
 
 #### Choose Sunrise-Sunset Offset
 
-* Select the offset to adjust display dimming time when the [Screen Dimmer Mode](#choose-screen-dimmer-mode) is set to **Sunrise-Sunset Dimming** mode. Dimming may be adjusted to start and end by an offset of 0, 30 or 60 minutes after Sunset and before Sunrise.
+* Select the offset to adjust display dimming time when the [Screen Dimmer Mode](#choose-screen-dimmer-mode) is set to **Sunrise-Sunset Dimming** mode. Timing may be adjusted by 0 minutes or set to start and end by an offset of 0, 30 or 60 minutes after Sunset and before Sunrise or before Sunset and after Sunrise.
 
 #### Light Sensor High (Dark) Threshold (0-4095)
 
-* Set the LDR (Light Dependent Resistor) sensor threshold value for darkness. Higher values are generated with a darker environment. The value must be between 0 and 4095 and higher than the [Low Threshold](#light-sensor-low-bright-threshold-0-4095).
+* Set the LDR (Light Dependent Resistor) sensor threshold value for darkness. Higher values are generated with a darker environment. The value must be between 0 and 4095 and greater than the [Low Threshold](#light-sensor-low-bright-threshold-0-4095).
 
 #### Light Sensor Low (Bright) Threshold (0-4095)
 
-* Set the LDR (Light Dependent Resistor) sensor threshold value for brightness. Lower values are generated with a brighter environment. The value must be between 0 and 4095 and lower than the [High Threshold](#light-sensor-high-bright-threshold-0-4095).
+* Set the LDR (Light Dependent Resistor) sensor threshold value for brightness. Lower values are generated with a brighter environment. The value must be between 0 and 4095 and less than the [High Threshold](#light-sensor-high-bright-threshold-0-4095).
 
 
 <u>**IMPORTANT:**</u> If you change values on the **Setup** page, click **Save**, then use the browser back arrow to return to the main **Configuration Portal** page. You **MUST** then select **Exit** to shut down the portal or your changes will NOT be saved.

@@ -77,6 +77,7 @@ enum class cydwwxdimmermode {
 // WiFi Manager Config
 WiFiManager wm; // global wm instance
 WiFiManagerParameter * wmWeeWXUrl; // global param ( for non blocking w params )
+WiFiManagerParameter * wmCydWeeWXHostname; 
 bool wifiManagerActive = false;
 uint32_t wifiManagerActiveTime = 0;
 String cydWeeWXPassword = String(CYD_WWX_WM_AP_PASSWORD);
@@ -112,7 +113,7 @@ const char* customWmHeaderHtml =
 "</script>";
 
 const char* screenMaxBrightnessHtml =
-"<br/><label for='MAXBRIGHTNESS'>Screen Max Brightness (0-255):</label>"
+"<br/><br/><label for='MAXBRIGHTNESS'>Screen Max Brightness (0-255):</label>"
 "<input type='number' max='255' min='0' id='MAXBRIGHTNESS' name='MAXBRIGHTNESS' onchange='updateMaxBrightnessField()'>";
 
 const char* screenDimBrightnessHtml =
@@ -148,8 +149,10 @@ const char* riseSetOffsetHtml =
 "<br/><label for='RISESETOFFSET'>Choose Sunrise-Sunset Offset:</label>"
 "<select name='RISESETOFFSET' id='RISESETOFFSET' onchange='updateRiseSetOffsetField()'>"
 "  <option value='0'>No Offset</option>"
-"  <option value='30'>30 Minutes</option>"
-"  <option value='60'>60 Minutes</option>"
+"  <option value='30'>30 Min Before Sunrise/After Sunset</option>"
+"  <option value='60'>60 Min Before Sunrise/After Sunset</option>"
+"  <option value='-30'>30 Min After Sunrise/Before Sunset</option>"
+"  <option value='-60'>60 Min After Sunrise/Before Sunset</option>"
 "</select>";
 
 WiFiManagerParameter * screenMaxBrightness;
@@ -171,23 +174,24 @@ WiFiManagerParameter * ldrLowThresholdHidden;
 
 // WeeWX setup parameters and preferences storage
 String cydWeeWXUrl = String(CYD_WWX_WEEWX_URL);
+String cydWeeWXHostname = String(CYD_WWX_HOSTNAME);
 uint16_t cydWeeWXBlMin = CYD_WWX_BL_MIN_BRIGHTNESS;
 uint16_t cydWeeWXBlMax = CYD_WWX_BL_MAX_BRIGHTNESS;
 cydwwxdimmermode cydWeeWXBlDimmerMode = (cydwwxdimmermode)CYD_WWX_DEFAULT_DIMMER_MODE;
 uint16_t cydWeeWXBlCurrent = CYD_WWX_BL_BRIGHTNESS;
 uint16_t cydWeeWXLdrLowThreshold = CYD_WWX_LDR_LOW_THRESHOLD;
 uint16_t cydWeeWXLdrHighThreshold = CYD_WWX_LDR_HIGH_THRESHOLD;
-uint16_t cydWeeWXDimmerStartHour = CYD_WWX_DIMMER_START_HOUR;
-uint16_t cydWeeWXDimmerStartMinute = CYD_WWX_DIMMER_START_MINUTE;
-uint16_t cydWeeWXDimmerEndHour = CYD_WWX_DIMMER_END_HOUR;
-uint16_t cydWeeWXDimmerEndMinute = CYD_WWX_DIMMER_END_MINUTE;
-uint16_t cydWeeWXRiseSetOffset = CYD_WWX_RISE_SET_OFFSET;
+int cydWeeWXDimmerStartHour = CYD_WWX_DIMMER_START_HOUR;
+int cydWeeWXDimmerStartMinute = CYD_WWX_DIMMER_START_MINUTE;
+int cydWeeWXDimmerEndHour = CYD_WWX_DIMMER_END_HOUR;
+int cydWeeWXDimmerEndMinute = CYD_WWX_DIMMER_END_MINUTE;
+int cydWeeWXRiseSetOffset = CYD_WWX_RISE_SET_OFFSET;
 
-unsigned int cydWeeWXDimmerStartTimeInMinutes = (CYD_WWX_DIMMER_START_HOUR * 60) + CYD_WWX_DIMMER_START_MINUTE;
-unsigned int cydWeeWXDimmerEndTimeInMinutes = (CYD_WWX_DIMMER_END_HOUR * 60) + CYD_WWX_DIMMER_END_MINUTE;
-unsigned int cydWeeWXCurrentTimeInMinutes = 0;
-unsigned int cydWeeWXSunriseTimeInMinutes = 0;
-unsigned int cydWeeWXSunsetTimeInMinutes = 0;
+int cydWeeWXDimmerStartTimeInMinutes = (CYD_WWX_DIMMER_START_HOUR * 60) + CYD_WWX_DIMMER_START_MINUTE;
+int cydWeeWXDimmerEndTimeInMinutes = (CYD_WWX_DIMMER_END_HOUR * 60) + CYD_WWX_DIMMER_END_MINUTE;
+int cydWeeWXCurrentTimeInMinutes = 0;
+int cydWeeWXSunriseTimeInMinutes = 0;
+int cydWeeWXSunsetTimeInMinutes = 0;
 
 Preferences cydWeeWXPreference;
 bool saveCydWeeWXConfigNow = false;
@@ -415,12 +419,14 @@ void tOpenMeteoUpdateCB() {
 
 // Configuration portal timer task disable callback
 void tTimerWifiManagerDisableCB() {
+  LOG_DEBUG("tTimerWifiManagerDisableCB", "Configuration portal timer disabled.");
   wifiManagerActiveTime = 0;
 }
 
 
 // Configuration portal exit timer callback
 void tTimerWifiManagerCB() {
+  LOG_DEBUG("tTimerWifiManagerCB", "Configuration portal active for " << wifiManagerActiveTime << " seconds.");
   wifiManagerActiveTime += 1;
   setWifiMessage();
   
@@ -470,7 +476,7 @@ void tCydWeeWXTriggerPinCB() {
       tProcessWifiManager.enable();
       tTimerWifiManager.enable();
       // WM in nonblocking so return status check has limited value.
-      if(wm.startConfigPortal(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {  
+      if(wm.startConfigPortal(cydWeeWXHostname.c_str(), cydWeeWXPassword.c_str())) {  
         LOG_INFO("tCydWeeWXTriggerPinCB", "WiFi connected.");
       }
 
@@ -483,6 +489,7 @@ void tCydWeeWXTriggerPinCB() {
 void tProcessWifiManagerCB() {
   
   if (wm.getConfigPortalActive()) {
+    // LOG_DEBUG("tProcessWifiManagerCB", "WM Portal still active.");
     wm.process();
   } else {
     LOG_DEBUG("tProcessWifiManagerCB", "WM Portal no longer active.");
@@ -524,6 +531,11 @@ void tProcessWifiManagerCB() {
 void tTimerReadLDRCB() {
   uint32_t newBrightness = cydWeeWXBlMax;
 
+  if (currentActiveDisplay != displayname::WEEWX_MAIN) 
+  {
+    return; // Only adjust brightness if on main display
+  }
+  
   switch (cydWeeWXBlDimmerMode) {
     case cydwwxdimmermode::NONE:
         break;
@@ -589,8 +601,8 @@ void tTimerReadLDRCB() {
 // WiFi Manager Callback
 // - executed when Config Portal shuts down
 void wifiConfigCB() {
-
-    displayReInit(displayname::WEEWX_MAIN);
+  LOG_DEBUG("wifiConfigCB", "WiFi Manager configuration completed.");
+  displayReInit(displayname::WEEWX_MAIN);
 }
 
 
@@ -613,6 +625,7 @@ void displayCleanup( void )
 
 void displayReInit( displayname whichDisplay )
 {
+  LOG_DEBUG("displayReInit", "Reinitializing display for display: " << (unsigned int)whichDisplay);
   lv_obj_clean ( lv_scr_act() ); // Clean objects from current screen.
   lv_obj_invalidate( lv_scr_act() ); // Invalidate objects for redraw.
   lv_refr_now( cydWeeWXDisp ); // Update display immediately.
@@ -823,6 +836,7 @@ static void timer_cb(lv_timer_t * timer) {
 
 // Create cydWeeWX GUI when booting
 void createBootGui(void) {
+  String bootMessage = String(programName) + String(" v") + String(programVersion) + String("\n\nBooting... Please wait.");
 
   currentActiveDisplay = displayname::BOOT_SCREEN;
   
@@ -833,7 +847,7 @@ void createBootGui(void) {
   lv_obj_add_style(lv_screen_active(), &displayStyle, 0);
 
   textLabelBootMessage = lv_label_create(lv_screen_active());
-  lv_label_set_text(textLabelBootMessage, "Booting... Please wait.");
+  lv_label_set_text(textLabelBootMessage, bootMessage.c_str());
   lv_obj_align(textLabelBootMessage, LV_ALIGN_CENTER, 0, -20);
   lv_obj_set_style_text_font((lv_obj_t*) textLabelBootMessage, &lv_font_montserrat_16, 0);
   lv_label_set_long_mode(textLabelBootMessage, LV_LABEL_LONG_WRAP);
@@ -1830,35 +1844,36 @@ void loadCydWeeWXConfig() {
   cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RO);
 
   cydWeeWXUrl = cydWeeWXPreference.getString(CYD_WWX_PREF_KEY_URL, cydWeeWXUrl);
-  LOG_INFO("loadCydWeeWxConfig", "Load config from preferences (WeeWX URL): " << cydWeeWXUrl.c_str());
-
+  LOG_DEBUG("loadCydWeeWxConfig", "Load config from preferences (WeeWX URL): " << cydWeeWXUrl.c_str());
+  cydWeeWXHostname = cydWeeWXPreference.getString(CYD_WWX_PREF_KEY_HOSTNAME, cydWeeWXHostname);
+  LOG_DEBUG("loadCydWeeWxConfig", "Hostname: " << cydWeeWXHostname.c_str());
   cydWeeWXBlMax = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_MAX_BRIGHTNESS, cydWeeWXBlMax);
-  LOG_INFO("loadCydWeeWxConfig", "Max Brightness (0-255): " << String(cydWeeWXBlMax));
+  LOG_DEBUG("loadCydWeeWxConfig", "Max Brightness (0-255): " << String(cydWeeWXBlMax));
   cydWeeWXBlMin = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_MIN_BRIGHTNESS, cydWeeWXBlMin);
-  LOG_INFO("loadCydWeeWxConfig", "Min Brightness (0-255): " << String(cydWeeWXBlMin));
+  LOG_DEBUG("loadCydWeeWxConfig", "Min Brightness (0-255): " << String(cydWeeWXBlMin));
   cydWeeWXBlDimmerMode = (cydwwxdimmermode)cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_DIMMER_MODE, (uint16_t)cydWeeWXBlDimmerMode);
-  LOG_INFO("loadCydWeeWxConfig", "Dimmer Selection (0-4): " << String((uint16_t)cydWeeWXBlDimmerMode));
-  cydWeeWXDimmerStartHour = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_DIMMER_START_HOUR, cydWeeWXDimmerStartHour);
-  cydWeeWXDimmerStartMinute = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_DIMMER_START_MINUTE, cydWeeWXDimmerStartMinute);
+  LOG_DEBUG("loadCydWeeWxConfig", "Dimmer Selection (0-4): " << String((uint16_t)cydWeeWXBlDimmerMode));
+  cydWeeWXDimmerStartHour = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_START_HOUR, cydWeeWXDimmerStartHour);
+  cydWeeWXDimmerStartMinute = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_START_MINUTE, cydWeeWXDimmerStartMinute);
   cydWeeWXDimmerStartTimeInMinutes = cydWeeWXDimmerStartHour * 60 + cydWeeWXDimmerStartMinute;
-  LOG_INFO("loadCydWeeWxConfig", "Dimmer Start Time (HH:MM): " << String(cydWeeWXDimmerStartHour) + ":" + String(cydWeeWXDimmerStartMinute));
-  cydWeeWXDimmerEndHour = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_DIMMER_END_HOUR, cydWeeWXDimmerEndHour);
-  cydWeeWXDimmerEndMinute = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_DIMMER_END_MINUTE, cydWeeWXDimmerEndMinute);
+  LOG_DEBUG("loadCydWeeWxConfig", "Dimmer Start Time (HH:MM): " << String(cydWeeWXDimmerStartHour) + ":" + String(cydWeeWXDimmerStartMinute));
+  cydWeeWXDimmerEndHour = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_END_HOUR, cydWeeWXDimmerEndHour);
+  cydWeeWXDimmerEndMinute = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_END_MINUTE, cydWeeWXDimmerEndMinute);
   cydWeeWXDimmerEndTimeInMinutes = cydWeeWXDimmerEndHour * 60 + cydWeeWXDimmerEndMinute;
-  LOG_INFO("loadCydWeeWxConfig", "Dimmer End Time (HH:MM): " << String(cydWeeWXDimmerEndHour) + ":" + String(cydWeeWXDimmerEndMinute));
-  cydWeeWXRiseSetOffset = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_RISE_SET_OFFSET, cydWeeWXRiseSetOffset);
-  LOG_INFO("loadCydWeeWxConfig", "Rise/Set Offset: " << String(cydWeeWXRiseSetOffset));
+  LOG_DEBUG("loadCydWeeWxConfig", "Dimmer End Time (HH:MM): " << String(cydWeeWXDimmerEndHour) + ":" + String(cydWeeWXDimmerEndMinute));
+  cydWeeWXRiseSetOffset = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_RISE_SET_OFFSET, cydWeeWXRiseSetOffset);
+  LOG_DEBUG("loadCydWeeWxConfig", "Rise/Set Offset: " << String(cydWeeWXRiseSetOffset));
   cydWeeWXLdrHighThreshold = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_LDR_HIGH_THRESHOLD, cydWeeWXLdrHighThreshold);
-  LOG_INFO("loadCydWeeWxConfig", "Light Sensor HighThreshold (0-4095): " << String(cydWeeWXLdrHighThreshold));
+  LOG_DEBUG("loadCydWeeWxConfig", "Light Sensor HighThreshold (0-4095): " << String(cydWeeWXLdrHighThreshold));
   cydWeeWXLdrLowThreshold = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_LDR_LOW_THRESHOLD, cydWeeWXLdrLowThreshold);
-  LOG_INFO("loadCydWeeWxConfig", "Light Sensor Low Threshold (0-4095): " << String(cydWeeWXLdrLowThreshold));
+  LOG_DEBUG("loadCydWeeWxConfig", "Light Sensor Low Threshold (0-4095): " << String(cydWeeWXLdrLowThreshold));
 
   cydWeeWXPreference.end();
 }
 
 // Save the WeeWX server URL to Preferences
 void saveCydWeeWxConfig() {
-  char buf[128] = {};
+  char buf[CYD_WWX_STRING_FIELD_LENGTH] = {};
   saveCydWeeWXConfigNow = false;
 
   strlcpy(buf, wmWeeWXUrl->getValue(), sizeof(buf));
@@ -1868,6 +1883,11 @@ void saveCydWeeWxConfig() {
   if (!cydWeeWXUrl.endsWith("/")) {
     cydWeeWXUrl = String(cydWeeWXUrl + "/");
   }
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, wmCydWeeWXHostname->getValue(), sizeof(buf));
+  cydWeeWXHostname = String(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Hostname: " << String(buf));
 
   memset(buf, '\0', strlen(buf));
   strlcpy(buf, screenMaxBrightnessHidden->getValue(), sizeof(buf));
@@ -1901,7 +1921,7 @@ void saveCydWeeWxConfig() {
   memset(buf, '\0', strlen(buf));
   strlcpy(buf, riseSetOffsetHidden->getValue(), sizeof(buf));
   cydWeeWXRiseSetOffset = atoi(buf);
-  LOG_DEBUG("saveCydWeeWxConfig", "Rise/Set Offset (0-3): " << String(buf));
+  LOG_DEBUG("saveCydWeeWxConfig", "Rise/Set Offset: " << String(buf));
 
   memset(buf, '\0', strlen(buf));
   strlcpy(buf, ldrHighThresholdHidden->getValue(), sizeof(buf));
@@ -1912,19 +1932,19 @@ void saveCydWeeWxConfig() {
   strlcpy(buf, ldrLowThresholdHidden->getValue(), sizeof(buf));
   cydWeeWXLdrLowThreshold = atoi(buf);
   LOG_DEBUG("saveCydWeeWxConfig", "Light Sensor Low Threshold (0-4095): " << String(buf));
-
   
   LOG_DEBUG("saveCydWeeWxConfig","Save config to preferences: " << cydWeeWXUrl.c_str());
   cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RW);
   cydWeeWXPreference.putString(CYD_WWX_PREF_KEY_URL, cydWeeWXUrl);
+  cydWeeWXPreference.putString(CYD_WWX_PREF_KEY_HOSTNAME, cydWeeWXHostname);
   cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_MAX_BRIGHTNESS, cydWeeWXBlMax);
   cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_MIN_BRIGHTNESS, cydWeeWXBlMin);
   cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_DIMMER_MODE, (uint16_t)cydWeeWXBlDimmerMode);
-  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_DIMMER_START_HOUR, cydWeeWXDimmerStartHour);
-  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_DIMMER_START_MINUTE, cydWeeWXDimmerStartMinute);
-  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_DIMMER_END_HOUR, cydWeeWXDimmerEndHour);
-  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_DIMMER_END_MINUTE, cydWeeWXDimmerEndMinute);
-  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_RISE_SET_OFFSET, cydWeeWXRiseSetOffset);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_START_HOUR, cydWeeWXDimmerStartHour);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_START_MINUTE, cydWeeWXDimmerStartMinute);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_END_HOUR, cydWeeWXDimmerEndHour);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_END_MINUTE, cydWeeWXDimmerEndMinute);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_RISE_SET_OFFSET, cydWeeWXRiseSetOffset);
   cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_LDR_HIGH_THRESHOLD, cydWeeWXLdrHighThreshold);
   cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_LDR_LOW_THRESHOLD, cydWeeWXLdrLowThreshold);
   cydWeeWXPreference.end();
@@ -2009,7 +2029,8 @@ void setup() {
   #endif  // CYD_WWX_WOKWI_ENTER_AP_AT_BOOT
   #endif  // CYD_WWX_RUN_ON_WOKWI
   
-  wmWeeWXUrl = new WiFiManagerParameter("URL", "WeeWX URL", cydWeeWXUrl.c_str(), CYD_WWX_WEEWX_URL_FIELD_LENGTH);
+  wmWeeWXUrl = new WiFiManagerParameter("URL", "WeeWX URL", cydWeeWXUrl.c_str(), CYD_WWX_STRING_FIELD_LENGTH);
+  wmCydWeeWXHostname = new WiFiManagerParameter("HOSTNAME", "cydWeeWX Hostname", cydWeeWXHostname.c_str(), CYD_WWX_STRING_FIELD_LENGTH);
   screenMaxBrightness = new WiFiManagerParameter(screenMaxBrightnessHtml);
   screenMaxBrightnessHidden = new WiFiManagerParameter("MAXBRIGHTNESSHIDDEN", "", String(cydWeeWXBlMax).c_str(), 10, WFM_NO_LABEL);
   screenDimBrightness = new WiFiManagerParameter(screenDimBrightnessHtml);
@@ -2032,6 +2053,7 @@ void setup() {
 
   wm.setCustomHeadElement(customWmHeaderHtml);
   wm.addParameter(wmWeeWXUrl);
+  wm.addParameter(wmCydWeeWXHostname);
   wm.addParameter(screenMaxBrightness);
   wm.addParameter(screenMaxBrightnessHidden);
   wm.addParameter(screenDimBrightness);
@@ -2050,7 +2072,7 @@ void setup() {
   wm.addParameter(ldrLowThresholdHidden);
 
   wm.setSaveParamsCallback(saveCydWeeWxConfigCB);
-  wm.setHostname(CYD_WWX_HOSTNAME);
+  wm.setHostname(cydWeeWXHostname);
   wm.setWiFiAutoReconnect(true);
   wm.setTitle(CYD_WWX_WM_TITLE);
   
@@ -2062,7 +2084,8 @@ void setup() {
   wm.setBreakAfterConfig(true);   // always exit configportal even if wifi save fails
   
   wm.setConfigPortalBlocking(false);
-  wm.setHostname(CYD_WWX_HOSTNAME);
+
+  wm._preloadwifiscan = true; // Preload WiFi scan results to improve performance of WiFi selection in portal
 
   #ifdef WIFI_MANAGER_ENABLE_PASSWORD_RANDOM
   cydWeeWXPassword = String(cydWeeWXPassword + "%04d");
@@ -2073,7 +2096,7 @@ void setup() {
   LOG_INFO("setup", "Starting WiFi Manager AP: " << CYD_WWX_WM_AP_NAME << " Password: " << cydWeeWXPassword);
 
   // WM in nonblocking mode so checking return status has limited value
-  if(wm.autoConnect(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {  
+  if(wm.autoConnect(cydWeeWXHostname.c_str(), cydWeeWXPassword.c_str())) {  
     LOG_INFO("setup", "WiFi Connected");
   }
 
@@ -2084,6 +2107,8 @@ void setup() {
     displayReInit(displayname::WEEWX_MAIN);
   } else {
     LOG_INFO("setup", "Wifi is NOT connected.");
+    tProcessWifiManager.enable();
+    tTimerWifiManager.enable();
     displayReInit(displayname::WIFI_MANAGER_MAIN);
   }
 

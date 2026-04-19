@@ -104,7 +104,7 @@
 #define CYD_WWX_OPEN_METEO_URL "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=weather_code"  // Open-Meteo URL (DO NOT CHANGE)
 #define CYD_WWX_WEEWX_URL "http://yourWeeWx.server.local/"  // This ia an example. May be changed here or through the Management Portal
 #define CYD_WWX_WEEWX_JSON_DATA_FILE "cyd_weewx.json"       // WeeWX JSON file name - DO NOT CHANGE
-#define CYD_WWX_WEEWX_URL_FIELD_LENGTH 64                   // Configuration Portal field length for WeeWX server URL
+#define CYD_WWX_STRING_FIELD_LENGTH 128                   // Configuration Portal field length for buffers
 
 // **************************************************************************************************
 // Message template strings - DO NOT CHANGE
@@ -117,7 +117,8 @@
 // WeeWX URL Stored in EEPROM Preferences
 // **************************************************************************************************
 #define CYD_WWX_PREFERENCES_NAMESPACE "cydWeeWX"    // Preferences Namespace
-#define CYD_WWX_PREF_KEY_URL "WEEWX_JSON_URL"    // Preferences Key name
+#define CYD_WWX_PREF_KEY_URL "WEEWX_JSON_URL"    // Preferences Key name for WeeWX URL
+#define CYD_WWX_PREF_KEY_HOSTNAME "HOSTNAME"    // Preferences Key name for device hostname
 #define CYD_WWX_PREF_KEY_DIMMER_MODE "MODE"    // Preferences Key name for dimmer mode
 #define CYD_WWX_PREF_KEY_DIMMER_START_HOUR "START_HR"    // Preferences Key name for dimmer start hour
 #define CYD_WWX_PREF_KEY_DIMMER_START_MINUTE "START_MIN"    // Preferences Key name for dimmer start minute

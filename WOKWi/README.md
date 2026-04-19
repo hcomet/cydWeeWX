@@ -2,7 +2,7 @@
 
 [WOKWi](https://wokwi.com) provides an emulation environment for IoT devices like the ESP32. A WOKWi account is required to use the simulator. The free version of WOKWi has a limit on the size of firmware that can be compiled and run directly on the site. The cydWeeWX firmware is bigger than that limit,  however there are two options where WOKWi can still be used to simulate cydWeeWX:
 * Directly on the WOKWi site. Go to the [cydWeeWX (CYD)](https://wokwi.com/projects/461472545882831873) project on WOKWi and use the upload firmware feature. 
-Click into the **diagram.json** tab, press **F1** then select **"Upload Firmware and Start Simulation..."**. You will need to upload a merged binary file see [below](#building-cydweewx-for-wokwi).
+Click into the **diagram.json** tab, press **F1** then select **"Upload Firmware and Start Simulation..."**. You will need to upload a merged binary file build for WOKWi, see [below](#building-cydweewx-for-wokwi).
 * Within VS Code using the [WOKWi extension](https://marketplace.visualstudio.com/items?itemName=Wokwi.wokwi-vscode). Details [below](#wokwi-simulator-for-vs-code-configuration).
 
 ## Building cydWeeWX for WOKWi
@@ -21,9 +21,9 @@ Second, the cydWeeWX ***cydWeeWXDefines.h*** file  needs to be modified to enabl
 
 Addtionally uncommenting either `CYD_WWX_WOKWI_ENTER_AP_AT_BOOT` or `CYD_WWX_WOKWI_SHOW_ERROR_STATE` will cause cydWeeWX to boot into different states in WOKWi.
 
-Both WOKWi options require a merged binary that combines the bootloader, partition table, application code and data partitions. Once you have built your own cydWeeWX binary you will need to go to build folder and find the ***cydWeeWX.ino.merged.bin*** file. This should be a 4096KB file. 
+Both WOKWi options require a merged binary that combines the bootloader, partition table, application code and data partitions. Once you have built your own cydWeeWX binary you will need to go to the build folder and find the ***cydWeeWX.ino.merged.bin*** file. This should be a 4096KB file. 
 
-**IMPORTANT:** Firmware built for the WOKWi Simulator WILL NOT run properly on the physical cydWeeWX. You may also need to switch back the ***User_Setup.h*** file to properly support a physical cydWeeWX.
+**IMPORTANT:** Firmware built for the WOKWi Simulator **WILL NOT** run properly on the physical cydWeeWX. You may also need to switch back the ***User_Setup.h*** file to properly support a physical cydWeeWX.
 
 ## WOKWi Simulator for VS Code Configuration
 
