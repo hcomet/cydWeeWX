@@ -54,11 +54,30 @@
 
 // Release info
 char programName[] = "cydWeeWX"; // Program name
-char programVersion[] = "1.0.0";  // program version
+char programVersion[] = "1.1.0";  // program version
+
+enum class cydwwxsensor {
+    TEMPERATURE = 0, 
+    HUMIDITY,
+    WIND, 
+    WIND_GUST, 
+    PRESSURE,
+    RAIN_RATE, 
+    MAX_SENSORS 
+};
+
+enum class cydwwxdimmermode {
+  NONE = 0,
+  AUTO,
+  SCHEDULED,
+  SUN_RISE_SET,
+  MAX_DIMMER_MODES
+};
 
 // WiFi Manager Config
 WiFiManager wm; // global wm instance
 WiFiManagerParameter * wmWeeWXUrl; // global param ( for non blocking w params )
+WiFiManagerParameter * wmCydWeeWXHostname; 
 bool wifiManagerActive = false;
 uint32_t wifiManagerActiveTime = 0;
 String cydWeeWXPassword = String(CYD_WWX_WM_AP_PASSWORD);
@@ -68,8 +87,112 @@ int cydWeeWXTriggerPin = CYD_WWX_WM_TRIGGER_PIN;
 int cydWeeWXTriggerPin = CYD_WWX_WOKWI_TRIGGER_PIN;
 #endif
 
-// WeeWX server url and preferences storage
+const char* customWmHeaderHtml =
+"<script>"
+"function updateMaxBrightnessField(){document.getElementById('MAXBRIGHTNESSHIDDEN').value=document.getElementById('MAXBRIGHTNESS').value}"
+"function updateDimBrightnessField(){document.getElementById('DIMBRIGHTNESSHIDDEN').value=document.getElementById('DIMBRIGHTNESS').value}"
+"function updateDimmerModeField(){document.getElementById('DIMMERMODEHIDDEN').value=document.getElementById('DIMMERMODE').value}"
+"function updateDimmerStartTimeField(){document.getElementById('DIMMERSTARTTIMEHIDDEN').value=document.getElementById('DIMMERSTARTTIME').value}"
+"function updateDimmerEndTimeField(){document.getElementById('DIMMERENDTIMEHIDDEN').value=document.getElementById('DIMMERENDTIME').value}"
+"function updateRiseSetOffsetField(){document.getElementById('RISESETOFFSETHIDDEN').value=document.getElementById('RISESETOFFSET').value}"
+"function updateLdrHighThresholdField(){document.getElementById('LDRHIGHTHRESHOLDHIDDEN').value=document.getElementById('LDRHIGHTHRESHOLD').value,"
+"document.getElementById('LDRLOWTHRESHOLD').max=document.getElementById('LDRHIGHTHRESHOLD').value}"
+"function updateLdrLowThresholdField(){document.getElementById('LDRLOWTHRESHOLDHIDDEN').value=document.getElementById('LDRLOWTHRESHOLD').value,"
+"document.getElementById('LDRHIGHTHRESHOLD').min=document.getElementById('LDRLOWTHRESHOLD').value}"
+"onload=function(){document.getElementById('MAXBRIGHTNESSHIDDEN')&&(document.getElementById('MAXBRIGHTNESSHIDDEN').style.display='none',"
+"document.getElementById('MAXBRIGHTNESS').value=document.getElementById('MAXBRIGHTNESSHIDDEN').value,document.getElementById('DIMBRIGHTNESSHIDDEN').style.display='none',"
+"document.getElementById('DIMBRIGHTNESS').value=document.getElementById('DIMBRIGHTNESSHIDDEN').value,document.getElementById('DIMMERMODEHIDDEN').style.display='none',"
+"document.getElementById('DIMMERMODE').value=document.getElementById('DIMMERMODEHIDDEN').value,document.getElementById('DIMMERSTARTTIMEHIDDEN').style.display='none',"
+"document.getElementById('DIMMERSTARTTIME').value=document.getElementById('DIMMERSTARTTIMEHIDDEN').value,document.getElementById('DIMMERENDTIMEHIDDEN').style.display='none',"
+"document.getElementById('DIMMERENDTIME').value=document.getElementById('DIMMERENDTIMEHIDDEN').value,document.getElementById('RISESETOFFSETHIDDEN').style.display='none',"
+"document.getElementById('RISESETOFFSET').value=document.getElementById('RISESETOFFSETHIDDEN').value,document.getElementById('LDRHIGHTHRESHOLDHIDDEN').style.display='none',"
+"document.getElementById('LDRHIGHTHRESHOLD').value=document.getElementById('LDRHIGHTHRESHOLDHIDDEN').value,document.getElementById('LDRLOWTHRESHOLDHIDDEN').style.display='none',"
+"document.getElementById('LDRLOWTHRESHOLD').value=document.getElementById('LDRLOWTHRESHOLDHIDDEN').value,"
+"document.getElementById('LDRHIGHTHRESHOLD').min=document.getElementById('LDRLOWTHRESHOLD').value,"
+"document.getElementById('LDRLOWTHRESHOLD').max=document.getElementById('LDRHIGHTHRESHOLD').value)};"
+"</script>";
+
+const char* screenMaxBrightnessHtml =
+"<br/><br/><label for='MAXBRIGHTNESS'>Screen Max Brightness (0-255):</label>"
+"<input type='number' max='255' min='0' id='MAXBRIGHTNESS' name='MAXBRIGHTNESS' onchange='updateMaxBrightnessField()'>";
+
+const char* screenDimBrightnessHtml =
+"<label for='DIMBRIGHTNESS'>Screen Dim Brightness (0-255):</label>"
+"<input type='number' max='255' min='0' id='DIMBRIGHTNESS' name='DIMBRIGHTNESS' onchange='updateDimBrightnessField()'>";
+
+const char* dimmerModeHtml = 
+"<br/><label for='DIMMERMODE'>Choose Screen Dimmer Mode:</label>"
+"<select name='DIMMERMODE' id='DIMMERMODE' onchange='updateDimmerModeField()'>"
+"  <option value='0'>No Dimming</option>"
+"  <option value='1'>Auto Dimming</option>"
+"  <option value='2'>Scheduled Dimming</option>"
+"  <option value='3'>Sunrise-Sunset Dimming</option>"
+"</select>";
+
+const char* ldrHighThresholdHtml =
+"<br/><label for='LDRHIGHTHRESHOLD'>Light Sensor High (Dark) Threshold (0-4095):</label>"
+"<input type='number' max='4095' min='0' id='LDRHIGHTHRESHOLD' name='LDRHIGHTHRESHOLD' onchange='updateLdrHighThresholdField()'>";
+
+const char* ldrLowThresholdHtml =
+"<label for='LDRLOWTHRESHOLD'>Light Sensor Low (Bright) Threshold (0-4095):</label>"
+"<input type='number' max='4095' min='0' id='LDRLOWTHRESHOLD' name='LDRLOWTHRESHOLD' onchange='updateLdrLowThresholdField()'>";
+
+const char* dimmerStartTimeHtml =
+"<br/><label for='DIMMERSTARTTIME'>Dimmer Start Time (HH:MM):</label>"
+"<input type='time' id='DIMMERSTARTTIME' name='DIMMERSTARTTIME' onchange='updateDimmerStartTimeField()'>";
+
+const char* dimmerEndTimeHtml =
+"<label for='DIMMERENDTIME'>Dimmer End Time (HH:MM):</label>"
+"<input type='time' id='DIMMERENDTIME' name='DIMMERENDTIME' onchange='updateDimmerEndTimeField()'>";
+
+const char* riseSetOffsetHtml = 
+"<br/><label for='RISESETOFFSET'>Choose Sunrise-Sunset Offset:</label>"
+"<select name='RISESETOFFSET' id='RISESETOFFSET' onchange='updateRiseSetOffsetField()'>"
+"  <option value='0'>No Offset</option>"
+"  <option value='30'>30 Min Before Sunrise/After Sunset</option>"
+"  <option value='60'>60 Min Before Sunrise/After Sunset</option>"
+"  <option value='-30'>30 Min After Sunrise/Before Sunset</option>"
+"  <option value='-60'>60 Min After Sunrise/Before Sunset</option>"
+"</select>";
+
+WiFiManagerParameter * screenMaxBrightness;
+WiFiManagerParameter * screenMaxBrightnessHidden;
+WiFiManagerParameter * screenDimBrightness;
+WiFiManagerParameter * screenDimBrightnessHidden;
+WiFiManagerParameter * dimmerMode;
+WiFiManagerParameter * dimmerModeHidden;
+WiFiManagerParameter * dimmerStartTime;
+WiFiManagerParameter * dimmerStartTimeHidden;
+WiFiManagerParameter * dimmerEndTime;
+WiFiManagerParameter * dimmerEndTimeHidden;
+WiFiManagerParameter * riseSetOffset;
+WiFiManagerParameter * riseSetOffsetHidden;
+WiFiManagerParameter * ldrHighThreshold;
+WiFiManagerParameter * ldrHighThresholdHidden;
+WiFiManagerParameter * ldrLowThreshold;
+WiFiManagerParameter * ldrLowThresholdHidden;
+
+// WeeWX setup parameters and preferences storage
 String cydWeeWXUrl = String(CYD_WWX_WEEWX_URL);
+String cydWeeWXHostname = String(CYD_WWX_HOSTNAME);
+uint16_t cydWeeWXBlMin = CYD_WWX_BL_MIN_BRIGHTNESS;
+uint16_t cydWeeWXBlMax = CYD_WWX_BL_MAX_BRIGHTNESS;
+cydwwxdimmermode cydWeeWXBlDimmerMode = (cydwwxdimmermode)CYD_WWX_DEFAULT_DIMMER_MODE;
+uint16_t cydWeeWXBlCurrent = CYD_WWX_BL_BRIGHTNESS;
+uint16_t cydWeeWXLdrLowThreshold = CYD_WWX_LDR_LOW_THRESHOLD;
+uint16_t cydWeeWXLdrHighThreshold = CYD_WWX_LDR_HIGH_THRESHOLD;
+int cydWeeWXDimmerStartHour = CYD_WWX_DIMMER_START_HOUR;
+int cydWeeWXDimmerStartMinute = CYD_WWX_DIMMER_START_MINUTE;
+int cydWeeWXDimmerEndHour = CYD_WWX_DIMMER_END_HOUR;
+int cydWeeWXDimmerEndMinute = CYD_WWX_DIMMER_END_MINUTE;
+int cydWeeWXRiseSetOffset = CYD_WWX_RISE_SET_OFFSET;
+
+int cydWeeWXDimmerStartTimeInMinutes = (CYD_WWX_DIMMER_START_HOUR * 60) + CYD_WWX_DIMMER_START_MINUTE;
+int cydWeeWXDimmerEndTimeInMinutes = (CYD_WWX_DIMMER_END_HOUR * 60) + CYD_WWX_DIMMER_END_MINUTE;
+int cydWeeWXCurrentTimeInMinutes = 0;
+int cydWeeWXSunriseTimeInMinutes = 0;
+int cydWeeWXSunsetTimeInMinutes = 0;
+
 Preferences cydWeeWXPreference;
 bool saveCydWeeWXConfigNow = false;
 
@@ -137,26 +260,13 @@ int weatherCode = 0;
 
 bool whichReadingsToShow = true;
 
-namespace sensortype {
-enum sensor
-  {
-    TEMPERATURE = 0, 
-    HUMIDITY,
-    WIND, 
-    WIND_GUST, 
-    PRESSURE,
-    RAIN_RATE, 
-    MAX_SENSORS 
-  };
-}
-
 struct trendLimits {
   float  lowLimit;
   float  highLimit;
 };
 
 // WeeWX trends are over the last hour. Set low and high limits for rate of change arrows
-const trendLimits trendLimitsForSensors[sensortype::MAX_SENSORS] = {
+const trendLimits trendLimitsForSensors[(unsigned int)cydwwxsensor::MAX_SENSORS] = {
   {.lowLimit=0.25, .highLimit=2.0},    // TEMPERATURE degrees C per hour
   {.lowLimit=1.0, .highLimit=5.0},    // HUMIDITY % per hour
   {.lowLimit=0.5, .highLimit=5.0},      // WIND km/h per hour
@@ -174,6 +284,7 @@ lv_display_t * cydWeeWXDisp;
 enum class displayname {
       WEEWX_MAIN = 0,
       WIFI_MANAGER_MAIN,
+      BOOT_SCREEN,
       MAX_DISPLAYNAME_TYPES
 };
 displayname currentActiveDisplay = displayname::MAX_DISPLAYNAME_TYPES;  // used as no active display
@@ -195,6 +306,7 @@ static lv_style_t gridStyle;
 static lv_style_t cellStyle;
 
 // LGVL Label Text Values
+static lv_obj_t * textLabelBootMessage;
 static lv_obj_t * textLabelWifiManagerMessage;
 static lv_obj_t * textLabelWifiManagerTimer;
 static lv_obj_t * textLabelWeatherDescription;
@@ -307,12 +419,14 @@ void tOpenMeteoUpdateCB() {
 
 // Configuration portal timer task disable callback
 void tTimerWifiManagerDisableCB() {
+  LOG_DEBUG("tTimerWifiManagerDisableCB", "Configuration portal timer disabled.");
   wifiManagerActiveTime = 0;
 }
 
 
 // Configuration portal exit timer callback
 void tTimerWifiManagerCB() {
+  LOG_DEBUG("tTimerWifiManagerCB", "Configuration portal active for " << wifiManagerActiveTime << " seconds.");
   wifiManagerActiveTime += 1;
   setWifiMessage();
   
@@ -362,7 +476,7 @@ void tCydWeeWXTriggerPinCB() {
       tProcessWifiManager.enable();
       tTimerWifiManager.enable();
       // WM in nonblocking so return status check has limited value.
-      if(wm.startConfigPortal(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {  
+      if(wm.startConfigPortal(cydWeeWXHostname.c_str(), cydWeeWXPassword.c_str())) {  
         LOG_INFO("tCydWeeWXTriggerPinCB", "WiFi connected.");
       }
 
@@ -375,6 +489,7 @@ void tCydWeeWXTriggerPinCB() {
 void tProcessWifiManagerCB() {
   
   if (wm.getConfigPortalActive()) {
+    // LOG_DEBUG("tProcessWifiManagerCB", "WM Portal still active.");
     wm.process();
   } else {
     LOG_DEBUG("tProcessWifiManagerCB", "WM Portal no longer active.");
@@ -414,20 +529,70 @@ void tProcessWifiManagerCB() {
 
 #ifdef CYD_WWX_LDR_PIN
 void tTimerReadLDRCB() {
-  int sensorValue = analogRead(CYD_WWX_LDR_PIN);
+  uint32_t newBrightness = cydWeeWXBlMax;
 
-  LOG_DEBUG("tTimerReadLDRCB", "LDR value: " << sensorValue );
-  if (sensorValue <= CYD_WWX_BL_LOW_THRESHOLD) {
-    ledcWrite(CYD_WWX_BL_PIN, CYD_WWX_BL_MAX_BRIGHTNESS);
-  } else if (sensorValue >= CYD_WWX_BL_HIGH_THRESHOLD) {
-    ledcWrite(CYD_WWX_BL_PIN, CYD_WWX_BL_MIN_BRIGHTNESS);
-  } else {
-    int newBrightness = ((((sensorValue - CYD_WWX_BL_LOW_THRESHOLD)*100)/(CYD_WWX_BL_HIGH_THRESHOLD - CYD_WWX_BL_LOW_THRESHOLD)) * (CYD_WWX_BL_MAX_BRIGHTNESS-CYD_WWX_BL_MIN_BRIGHTNESS))/100 + CYD_WWX_BL_MIN_BRIGHTNESS;
+  if (currentActiveDisplay != displayname::WEEWX_MAIN) 
+  {
+    return; // Only adjust brightness if on main display
+  }
+  
+  switch (cydWeeWXBlDimmerMode) {
+    case cydwwxdimmermode::NONE:
+        break;
+    case cydwwxdimmermode::AUTO:
+      {
+        uint16_t sensorValue = analogRead(CYD_WWX_LDR_PIN);
 
-    LOG_DEBUG("tTimerReadLDRCB", "Set brightness: " << newBrightness );
-    if ((newBrightness >= CYD_WWX_BL_MIN_BRIGHTNESS) && (newBrightness <= CYD_WWX_BL_MAX_BRIGHTNESS)) {
-      ledcWrite(CYD_WWX_BL_PIN, newBrightness);
-    }
+        LOG_DEBUG("tTimerReadLDRCB", "LDR value: " << sensorValue );
+        if (sensorValue <= cydWeeWXLdrLowThreshold) {
+          newBrightness = cydWeeWXBlMax;
+        } else if (sensorValue >= cydWeeWXLdrHighThreshold) {
+          newBrightness = cydWeeWXBlMin;
+        } else {
+          newBrightness = ((((sensorValue - cydWeeWXLdrLowThreshold)*100)/(cydWeeWXLdrHighThreshold - cydWeeWXLdrLowThreshold)) * (cydWeeWXBlMax-cydWeeWXBlMin))/100 + cydWeeWXBlMin;
+
+          if (newBrightness > cydWeeWXBlMax) {
+            newBrightness = cydWeeWXBlMax;
+          } else if (newBrightness < cydWeeWXBlMin) {
+            newBrightness = cydWeeWXBlMin;
+          }
+        }
+        break;
+      };
+    case cydwwxdimmermode::SCHEDULED:
+        if (cydWeeWXDimmerStartTimeInMinutes < cydWeeWXDimmerEndTimeInMinutes) {
+          if ((cydWeeWXCurrentTimeInMinutes >= cydWeeWXDimmerStartTimeInMinutes) && (cydWeeWXCurrentTimeInMinutes < cydWeeWXDimmerEndTimeInMinutes)) {
+            newBrightness = cydWeeWXBlMin;
+          } else {
+            newBrightness = cydWeeWXBlMax;
+          }
+        } else {
+          if ((cydWeeWXCurrentTimeInMinutes < cydWeeWXDimmerStartTimeInMinutes) && (cydWeeWXCurrentTimeInMinutes >= cydWeeWXDimmerEndTimeInMinutes)) {
+            newBrightness = cydWeeWXBlMax;
+          } else {
+            newBrightness = cydWeeWXBlMin;
+          }
+        } 
+        break;
+    case cydwwxdimmermode::SUN_RISE_SET:
+      {
+        if ((cydWeeWXCurrentTimeInMinutes < (cydWeeWXSunsetTimeInMinutes+cydWeeWXRiseSetOffset)) && 
+            (cydWeeWXCurrentTimeInMinutes > (cydWeeWXSunriseTimeInMinutes-cydWeeWXRiseSetOffset))) {
+          newBrightness = cydWeeWXBlMax;
+        } else {
+          newBrightness = cydWeeWXBlMin;
+        }
+        break;
+      } 
+    default:
+        break;
+  }
+
+  LOG_DEBUG("tTimerReadLDRCB", "Dimmer mode: " << (unsigned int)cydWeeWXBlDimmerMode << " Current time in minutes: " << cydWeeWXCurrentTimeInMinutes << " Sunrise time in minutes: " << cydWeeWXSunriseTimeInMinutes << " Sunset time in minutes: " << cydWeeWXSunsetTimeInMinutes << " Calculated brightness: " << newBrightness);
+  if (newBrightness != cydWeeWXBlCurrent) {
+    cydWeeWXBlCurrent = newBrightness;
+    LOG_DEBUG("tTimerReadLDRCB", "Set brightness: " << cydWeeWXBlCurrent );
+    ledcWrite(CYD_WWX_BL_PIN, cydWeeWXBlCurrent);
   }
 }
 #endif // CYD_WWX_LDR_PIN
@@ -436,8 +601,8 @@ void tTimerReadLDRCB() {
 // WiFi Manager Callback
 // - executed when Config Portal shuts down
 void wifiConfigCB() {
-
-    displayReInit(displayname::WEEWX_MAIN);
+  LOG_DEBUG("wifiConfigCB", "WiFi Manager configuration completed.");
+  displayReInit(displayname::WEEWX_MAIN);
 }
 
 
@@ -449,8 +614,8 @@ void wifiConfigCB() {
 //
 void displayCleanup( void )
 {
+  lv_style_reset( &displayStyle );
   if (currentActiveDisplay == displayname::WEEWX_MAIN ) {
-    lv_style_reset( &displayStyle );
     lv_style_reset( &myDayStyle );
     lv_style_reset( &myNightStyle );
     lv_style_reset( &gridStyle );
@@ -460,6 +625,7 @@ void displayCleanup( void )
 
 void displayReInit( displayname whichDisplay )
 {
+  LOG_DEBUG("displayReInit", "Reinitializing display for display: " << (unsigned int)whichDisplay);
   lv_obj_clean ( lv_scr_act() ); // Clean objects from current screen.
   lv_obj_invalidate( lv_scr_act() ); // Invalidate objects for redraw.
   lv_refr_now( cydWeeWXDisp ); // Update display immediately.
@@ -477,9 +643,10 @@ void displayReInit( displayname whichDisplay )
   tLvglHandler.enable();
 
   // Initialize the TFT display using the TFT_eSPI library
+  memset(draw_buf, 0x00, sizeof(draw_buf));
   cydWeeWXDisp = lv_tft_espi_create(CYD_WWX_SCREEN_WIDTH, CYD_WWX_SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
   lv_display_set_rotation(cydWeeWXDisp, LV_DISPLAY_ROTATION_90);
-
+  lv_refr_now( cydWeeWXDisp );
   if (whichDisplay == displayname::WEEWX_MAIN) {
       tWeeWXUpdate.enable();
       tOpenMeteoUpdate.enable();
@@ -506,12 +673,14 @@ void setCydWeeWXErrorState(int state) {
 }
 
 // Set the Sensor trend arrow direction string
-void setSensorTrend( float trend, sensortype::sensor type) {
+void setSensorTrend( float trend, cydwwxsensor type) {
   String trendString = String();
+  unsigned int limitIndex = (unsigned int)type;
 
-  LOG_DEBUG("setSensorTrend", "Sensor <" << type << "> trend: " << trend << " vs " << trendLimitsForSensors[type].lowLimit << " to " << trendLimitsForSensors[type].highLimit);
+  LOG_DEBUG("setSensorTrend", "Sensor <" << (int)type << "> trend: " << trend << " vs " << trendLimitsForSensors[limitIndex].lowLimit << " to " 
+    << trendLimitsForSensors[limitIndex].highLimit);
   
-  if (abs(trend) >= trendLimitsForSensors[type].highLimit) {
+  if (abs(trend) >= trendLimitsForSensors[limitIndex].highLimit) {
     if (trend >= 0) {
       trendString = String(WI_DIRECTION_UP);
       LOG_DEBUG("setSensorTrend", "UP");
@@ -519,7 +688,7 @@ void setSensorTrend( float trend, sensortype::sensor type) {
       trendString = String(WI_DIRECTION_DOWN);
       LOG_DEBUG("setSensorTrend", "DOWN");
     } 
-  } else if (abs(trend) >= trendLimitsForSensors[type].lowLimit) {
+  } else if (abs(trend) >= trendLimitsForSensors[limitIndex].lowLimit) {
     if (trend >= 0) {
       trendString = String(WI_DIRECTION_UP_RIGHT);
       LOG_DEBUG("setSensorTrend", "UP_RIGHT");
@@ -527,22 +696,28 @@ void setSensorTrend( float trend, sensortype::sensor type) {
       trendString = String(WI_DIRECTION_DOWN_RIGHT);
       LOG_DEBUG("setSensorTrend", "DOWN_RIGHT");
     } 
+  } else {
+    trendString = String(WI_DIRECTION_RIGHT);
+    LOG_DEBUG("setSensorTrend", "RIGHT");
   }
 
   switch (type) {
-  case sensortype::TEMPERATURE:
+  case cydwwxsensor::TEMPERATURE:
     trendTemperature = trendString;
     break;
-  case sensortype::HUMIDITY:
+  case cydwwxsensor::HUMIDITY:
     trendHumidity = trendString;
     break;
-  case sensortype::WIND_GUST:
+  case cydwwxsensor::WIND:
+    trendWind = trendString;
+    break;
+  case cydwwxsensor::WIND_GUST:
     trendWindGust = trendString;
     break;
-  case sensortype::PRESSURE:
+  case cydwwxsensor::PRESSURE:
     trendPressure = trendString;
     break;
-  case sensortype::RAIN_RATE:
+  case cydwwxsensor::RAIN_RATE:
     trendRainRate = trendString;
     break;
   default:
@@ -560,91 +735,132 @@ uint32_t cydWeeWXTickCB() {
 static void timer_cb(lv_timer_t * timer) {
   LV_UNUSED(timer);
 
-  if (currentActiveDisplay == displayname::WEEWX_MAIN) {
-    if (isDay)
+  switch (currentActiveDisplay) 
+  {
+    case displayname::WEEWX_MAIN:
     {
-      lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
-      lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
-      lv_obj_add_style(weatherIconBox, &myDayStyle, 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
-    }
-    else
-    {
-      lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
-      lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
-      lv_obj_add_style(weatherIconBox, &myNightStyle, 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
-    }
+      if (isDay)
+      {
+        lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
+        lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
+        lv_obj_add_style(weatherIconBox, &myDayStyle, 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_DAY_TEXT_COLOR), 0);
+      }
+      else
+      {
+        lv_obj_remove_style(weatherIconBox, &myNightStyle, 0);
+        lv_obj_remove_style(weatherIconBox, &myDayStyle, 0);
+        lv_obj_add_style(weatherIconBox, &myNightStyle, 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelIconWMO, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_NIGHT_TEXT_COLOR), 0);
+      }
 
-    if (cydWeeWXErrorState == CYD_WWX_CRITICAL_ERROR) {
-      // If critical then will reboot every 3 minutes, show error in header and reboot timer in weather description
-      setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelWeatherDescription, String("Error state. Reboot in: " + String(CYD_WWX_ERROR_WAIT_TO_REBOOT-cydWeeWXErrorStateTimer) + " seconds.").c_str());
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelScreenHeader, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelScreenHeader, errorHeaderMessage.c_str());
-    } else if (cydWeeWXErrorState == CYD_WWX_NON_CRITICAL_ERROR) {
-      // If non-crititcal then just show error in the weather description
-      setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
-      lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
-      lv_label_set_text(textLabelWeatherDescription, errorHeaderMessage.c_str()); 
-      lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
-    } else {
-      setWmoIconAndDescription(weatherCode);
-      lv_label_set_text(textLabelWeatherDescription, weatherDescription.c_str());
-      lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
-    }
-    
-    lv_label_set_text(textLabelTemperature, temperature.c_str());
-    lv_label_set_text(textLabelTrendTemperature, trendTemperature.c_str());
-    lv_label_set_text(textLabelInsideTemperature, insideTemperature.c_str());
-    lv_label_set_text(textLabelUnitsTemperature, unitsTemperature.c_str());
-    lv_label_set_text(textLabelHumidity, humidity.c_str());
-    lv_label_set_text(textLabelTrendHumidity, trendHumidity.c_str());
-    lv_label_set_text(textLabelInsideHumidity, insideHumidity.c_str());
-    lv_label_set_text(textLabelUnitsHumidity, unitsHumidity.c_str());
-    whichReadingsToShow = !whichReadingsToShow;
-    if (whichReadingsToShow) {
-      lv_label_set_text(textLabelReadingsGrid31, iconWind.c_str());
-      lv_label_set_text(textLabelReadingsGrid32, wind.c_str());
-      lv_label_set_text(textLabelReadingsGrid33, trendWind.c_str());
-      lv_label_set_text(textLabelReadingsGrid34, unitsWind.c_str());
-      lv_label_set_text(textLabelReadingsGrid35, windDirection.c_str());
-      lv_label_set_text(textLabelReadingsGrid41, iconWindGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid42, windGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid43, trendWindGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid44, unitsWindGust.c_str());
-      lv_label_set_text(textLabelReadingsGrid45, windGustDirection.c_str());
-    } else {
+      if (cydWeeWXErrorState == CYD_WWX_CRITICAL_ERROR) {
+        // If critical then will reboot every 3 minutes, show error in header and reboot timer in weather description
+        setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
+        lv_label_set_text(textLabelWeatherDescription, String("Error state. Reboot in: " + String(CYD_WWX_ERROR_WAIT_TO_REBOOT-cydWeeWXErrorStateTimer) + " seconds.").c_str());
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelScreenHeader, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
+        lv_label_set_text(textLabelScreenHeader, errorHeaderMessage.c_str());
+      } else if (cydWeeWXErrorState == CYD_WWX_NON_CRITICAL_ERROR) {
+        // If non-crititcal then just show error in the weather description
+        setWmoIconAndDescription(CYD_WWX_ERROR_STATE_CODE);
+        lv_obj_set_style_text_color((lv_obj_t*) textLabelWeatherDescription, lv_color_hex(CYD_WWX_ERROR_TEXT_COLOR), 0);
+        lv_label_set_text(textLabelWeatherDescription, errorHeaderMessage.c_str()); 
+        lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
+      } else {
+        setWmoIconAndDescription(weatherCode);
+        lv_label_set_text(textLabelWeatherDescription, weatherDescription.c_str());
+        lv_label_set_text(textLabelScreenHeader, screenHeader.c_str());
+      }
       
-      lv_label_set_text(textLabelReadingsGrid31, iconPressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid32, pressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid33, trendPressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid34, unitsPressure.c_str());
-      lv_label_set_text(textLabelReadingsGrid35, "");
-      lv_label_set_text(textLabelReadingsGrid41, iconRainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid42, rainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid43, trendRainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid44, unitsRainRate.c_str());
-      lv_label_set_text(textLabelReadingsGrid45, "");
+      lv_label_set_text(textLabelTemperature, temperature.c_str());
+      lv_label_set_text(textLabelTrendTemperature, trendTemperature.c_str());
+      lv_label_set_text(textLabelInsideTemperature, insideTemperature.c_str());
+      lv_label_set_text(textLabelUnitsTemperature, unitsTemperature.c_str());
+      lv_label_set_text(textLabelHumidity, humidity.c_str());
+      lv_label_set_text(textLabelTrendHumidity, trendHumidity.c_str());
+      lv_label_set_text(textLabelInsideHumidity, insideHumidity.c_str());
+      lv_label_set_text(textLabelUnitsHumidity, unitsHumidity.c_str());
+      whichReadingsToShow = !whichReadingsToShow;
+      if (whichReadingsToShow) {
+        lv_label_set_text(textLabelReadingsGrid31, iconWind.c_str());
+        lv_label_set_text(textLabelReadingsGrid32, wind.c_str());
+        lv_label_set_text(textLabelReadingsGrid33, trendWind.c_str());
+        lv_label_set_text(textLabelReadingsGrid34, unitsWind.c_str());
+        lv_label_set_text(textLabelReadingsGrid35, windDirection.c_str());
+        lv_label_set_text(textLabelReadingsGrid41, iconWindGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid42, windGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid43, trendWindGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid44, unitsWindGust.c_str());
+        lv_label_set_text(textLabelReadingsGrid45, windGustDirection.c_str());
+      } else {
+        
+        lv_label_set_text(textLabelReadingsGrid31, iconPressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid32, pressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid33, trendPressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid34, unitsPressure.c_str());
+        lv_label_set_text(textLabelReadingsGrid35, "");
+        lv_label_set_text(textLabelReadingsGrid41, iconRainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid42, rainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid43, trendRainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid44, unitsRainRate.c_str());
+        lv_label_set_text(textLabelReadingsGrid45, "");
+      }
+      lv_label_set_text(textLabelSunrise, sunrise.c_str());
+      lv_label_set_text(textLabelSunset, sunset.c_str());
+      lv_label_set_text(textLabelMoonrise, moonrise.c_str());
+      lv_label_set_text(textLabelMoonset, moonset.c_str());
+      lv_label_set_text(textLabelMoonPhase, moonPhase.c_str());
+      lv_label_set_text(textLabelIconMoonPhase, iconMoonPhase.c_str());
+      break;
     }
-    lv_label_set_text(textLabelSunrise, sunrise.c_str());
-    lv_label_set_text(textLabelSunset, sunset.c_str());
-    lv_label_set_text(textLabelMoonrise, moonrise.c_str());
-    lv_label_set_text(textLabelMoonset, moonset.c_str());
-    lv_label_set_text(textLabelMoonPhase, moonPhase.c_str());
-    lv_label_set_text(textLabelIconMoonPhase, iconMoonPhase.c_str());
-
-  } else if (currentActiveDisplay == displayname::WIFI_MANAGER_MAIN) {
-    setWifiMessage();
-    lv_label_set_text(textLabelWifiManagerTimer, wifiManagerTimer.c_str());
-  } else {
-    LOG_ERROR("timer_cb", "No current display defined.");
+    case displayname::WIFI_MANAGER_MAIN:
+    {
+      setWifiMessage();
+      lv_label_set_text(textLabelWifiManagerTimer, wifiManagerTimer.c_str());
+      break;
+    }
+    case displayname::BOOT_SCREEN:
+    {
+      break;
+    }
+    default:
+    {
+      LOG_ERROR("timer_cb", "No current display defined.");
+      break;
+    }
   }
+}
+
+// Create cydWeeWX GUI when booting
+void createBootGui(void) {
+  String bootMessage = String(programName) + String(" v") + String(programVersion) + String("\n\nBooting... Please wait.");
+
+  currentActiveDisplay = displayname::BOOT_SCREEN;
+  
+  lv_obj_set_scrollbar_mode(lv_screen_active(), LV_SCROLLBAR_MODE_OFF);
+  lv_style_reset(&displayStyle);
+  lv_style_init(&displayStyle);
+  lv_style_set_bg_color(&displayStyle, lv_color_hex(CYD_WWX_WIFI_MANAGER_BG_COLOR)); 
+  lv_obj_add_style(lv_screen_active(), &displayStyle, 0);
+
+  textLabelBootMessage = lv_label_create(lv_screen_active());
+  lv_label_set_text(textLabelBootMessage, bootMessage.c_str());
+  lv_obj_align(textLabelBootMessage, LV_ALIGN_CENTER, 0, -20);
+  lv_obj_set_style_text_font((lv_obj_t*) textLabelBootMessage, &lv_font_montserrat_16, 0);
+  lv_label_set_long_mode(textLabelBootMessage, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_color((lv_obj_t*) textLabelBootMessage, lv_color_hex(CYD_WWX_WIFI_MANAGER_TEXT_COLOR), 0);
+  lv_obj_set_width(textLabelBootMessage, 320);
+  lv_obj_set_style_text_align(textLabelBootMessage, LV_TEXT_ALIGN_CENTER, 0);
+  
+  lv_refr_now( cydWeeWXDisp );
+  lv_timer_t * timer = lv_timer_create(timer_cb, CYD_WWX_WEEWX_LV_TIMER, NULL);
+  lv_timer_ready(timer);
 
 }
+
 
 // Create cydWeeWX GUI when in configuration portal mode
 void createMainWifiManagerGui(void) {
@@ -699,8 +915,8 @@ void createMainWeeWXGui(void) {
   lv_style_set_pad_row(&gridStyle, 0);
   lv_style_set_pad_column(&gridStyle, 0);
   lv_style_set_pad_all(&gridStyle, 0);
-  lv_style_set_bg_color(&gridStyle, lv_obj_get_style_bg_color(lv_screen_active(),0));
-  lv_style_set_border_color(&gridStyle, lv_obj_get_style_bg_color(lv_screen_active(),0));
+  lv_style_set_bg_color(&gridStyle, lv_obj_get_style_bg_color(lv_screen_active(),LV_PART_MAIN));
+  lv_style_set_border_color(&gridStyle, lv_obj_get_style_bg_color(lv_screen_active(),LV_PART_MAIN));
 
   lv_style_init(&cellStyle);
   lv_style_set_pad_all(&cellStyle, 0);
@@ -1499,7 +1715,7 @@ void getWeeWXData() {
           sprintf(tbuf, "%6.1f", tempTemperature);
           temperature = String(tbuf);
           unitsTemperature = String(doc["current"]["temperature"]["units"]);
-          setSensorTrend( temperatureTrend, sensortype::TEMPERATURE);
+          setSensorTrend( temperatureTrend, cydwwxsensor::TEMPERATURE);
 
           memset(tbuf, '\0', strlen(tbuf));
           sprintf(tbuf, "%6.1f", tempInsideTemperature);
@@ -1510,7 +1726,7 @@ void getWeeWXData() {
           humidity = String(tbuf);
           unitsHumidity = String(doc["current"]["humidity"]["units"]);
 
-          setSensorTrend( humidityTrend, sensortype::HUMIDITY);
+          setSensorTrend( humidityTrend, cydwwxsensor::HUMIDITY);
 
           memset(tbuf, '\0', strlen(tbuf));
           sprintf(tbuf, "%2.0f", tempInsideHumidity);
@@ -1521,7 +1737,7 @@ void getWeeWXData() {
           wind = String(tbuf);
           unitsWind = String(doc["current"]["wind speed"]["units"]);
 
-          setSensorTrend( windTrend, sensortype::WIND);
+          setSensorTrend( windTrend, cydwwxsensor::WIND);
 
           windDirection = getWindDirectionString(tempWindDir);
 
@@ -1530,7 +1746,7 @@ void getWeeWXData() {
           windGust = String(tbuf);
           unitsWindGust = String(doc["current"]["wind gust"]["units"]);
 
-          setSensorTrend( windGustTrend, sensortype::WIND_GUST);
+          setSensorTrend( windGustTrend, cydwwxsensor::WIND_GUST);
 
           windGustDirection = getWindDirectionString(tempWindDir);
 
@@ -1539,14 +1755,14 @@ void getWeeWXData() {
           pressure = String(tbuf);
           unitsPressure = String(doc["current"]["barometer"]["units"]);
 
-          setSensorTrend( pressureTrend, sensortype::PRESSURE);
+          setSensorTrend( pressureTrend, cydwwxsensor::PRESSURE);
 
           memset(tbuf, '\0', strlen(tbuf));
           sprintf(tbuf, "%4.0f", tempRainRate);
           rainRate = String(tbuf);
           unitsRainRate = String(doc["current"]["rain rate"]["units"]);
 
-          setSensorTrend( rainRateTrend, sensortype::RAIN_RATE);
+          setSensorTrend( rainRateTrend, cydwwxsensor::RAIN_RATE);
 
           // Split the datetime into date and time
           String datetime_str = String(datetime);
@@ -1583,6 +1799,12 @@ void getWeeWXData() {
           LOG_DEBUG("getWeeWXData", "Moonset: " << moonset);
 
           setMoonPhaseString( moonPhasePercent, moonWaxing);
+
+          cydWeeWXCurrentTimeInMinutes = datetime_str.substring(splitIndex + 1, splitIndex + 6).substring(0, 2).toInt() * 60 + 
+                                          datetime_str.substring(splitIndex + 1, splitIndex + 6).substring(3, 5).toInt();
+          cydWeeWXSunriseTimeInMinutes = sunrise.substring(0, 2).toInt() * 60 + sunrise.substring(3, 5).toInt();
+          cydWeeWXSunsetTimeInMinutes = sunset.substring(0, 2).toInt() * 60 + sunset.substring(3, 5).toInt();
+
 
         } else {  // DeserializationError error
 
@@ -1621,22 +1843,37 @@ void loadCydWeeWXConfig() {
 
   cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RO);
 
-  if (!cydWeeWXPreference.isKey(CYD_WWX_PREFERENCES_KEY)) {
-    cydWeeWXPreference.end();
-    cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RW);
-    cydWeeWXPreference.putString(CYD_WWX_PREFERENCES_KEY, cydWeeWXUrl);
-    cydWeeWXPreference.end();
-    cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RO); 
-  }
+  cydWeeWXUrl = cydWeeWXPreference.getString(CYD_WWX_PREF_KEY_URL, cydWeeWXUrl);
+  LOG_DEBUG("loadCydWeeWxConfig", "Load config from preferences (WeeWX URL): " << cydWeeWXUrl.c_str());
+  cydWeeWXHostname = cydWeeWXPreference.getString(CYD_WWX_PREF_KEY_HOSTNAME, cydWeeWXHostname);
+  LOG_DEBUG("loadCydWeeWxConfig", "Hostname: " << cydWeeWXHostname.c_str());
+  cydWeeWXBlMax = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_MAX_BRIGHTNESS, cydWeeWXBlMax);
+  LOG_DEBUG("loadCydWeeWxConfig", "Max Brightness (0-255): " << String(cydWeeWXBlMax));
+  cydWeeWXBlMin = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_MIN_BRIGHTNESS, cydWeeWXBlMin);
+  LOG_DEBUG("loadCydWeeWxConfig", "Min Brightness (0-255): " << String(cydWeeWXBlMin));
+  cydWeeWXBlDimmerMode = (cydwwxdimmermode)cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_DIMMER_MODE, (uint16_t)cydWeeWXBlDimmerMode);
+  LOG_DEBUG("loadCydWeeWxConfig", "Dimmer Selection (0-4): " << String((uint16_t)cydWeeWXBlDimmerMode));
+  cydWeeWXDimmerStartHour = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_START_HOUR, cydWeeWXDimmerStartHour);
+  cydWeeWXDimmerStartMinute = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_START_MINUTE, cydWeeWXDimmerStartMinute);
+  cydWeeWXDimmerStartTimeInMinutes = cydWeeWXDimmerStartHour * 60 + cydWeeWXDimmerStartMinute;
+  LOG_DEBUG("loadCydWeeWxConfig", "Dimmer Start Time (HH:MM): " << String(cydWeeWXDimmerStartHour) + ":" + String(cydWeeWXDimmerStartMinute));
+  cydWeeWXDimmerEndHour = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_END_HOUR, cydWeeWXDimmerEndHour);
+  cydWeeWXDimmerEndMinute = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_DIMMER_END_MINUTE, cydWeeWXDimmerEndMinute);
+  cydWeeWXDimmerEndTimeInMinutes = cydWeeWXDimmerEndHour * 60 + cydWeeWXDimmerEndMinute;
+  LOG_DEBUG("loadCydWeeWxConfig", "Dimmer End Time (HH:MM): " << String(cydWeeWXDimmerEndHour) + ":" + String(cydWeeWXDimmerEndMinute));
+  cydWeeWXRiseSetOffset = cydWeeWXPreference.getInt(CYD_WWX_PREF_KEY_RISE_SET_OFFSET, cydWeeWXRiseSetOffset);
+  LOG_DEBUG("loadCydWeeWxConfig", "Rise/Set Offset: " << String(cydWeeWXRiseSetOffset));
+  cydWeeWXLdrHighThreshold = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_LDR_HIGH_THRESHOLD, cydWeeWXLdrHighThreshold);
+  LOG_DEBUG("loadCydWeeWxConfig", "Light Sensor HighThreshold (0-4095): " << String(cydWeeWXLdrHighThreshold));
+  cydWeeWXLdrLowThreshold = cydWeeWXPreference.getUShort(CYD_WWX_PREF_KEY_LDR_LOW_THRESHOLD, cydWeeWXLdrLowThreshold);
+  LOG_DEBUG("loadCydWeeWxConfig", "Light Sensor Low Threshold (0-4095): " << String(cydWeeWXLdrLowThreshold));
 
-  cydWeeWXUrl = cydWeeWXPreference.getString(CYD_WWX_PREFERENCES_KEY);
-  LOG_DEBUG("loadCydWeeWXConfig", "Load config from preferences: " << cydWeeWXUrl.c_str());
   cydWeeWXPreference.end();
 }
 
 // Save the WeeWX server URL to Preferences
 void saveCydWeeWxConfig() {
-  char buf[128] = {};
+  char buf[CYD_WWX_STRING_FIELD_LENGTH] = {};
   saveCydWeeWXConfigNow = false;
 
   strlcpy(buf, wmWeeWXUrl->getValue(), sizeof(buf));
@@ -1646,9 +1883,70 @@ void saveCydWeeWxConfig() {
   if (!cydWeeWXUrl.endsWith("/")) {
     cydWeeWXUrl = String(cydWeeWXUrl + "/");
   }
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, wmCydWeeWXHostname->getValue(), sizeof(buf));
+  cydWeeWXHostname = String(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Hostname: " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, screenMaxBrightnessHidden->getValue(), sizeof(buf));
+  cydWeeWXBlMax = atoi(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Hidden Max Brightness (0-255): " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, screenDimBrightnessHidden->getValue(), sizeof(buf));
+  cydWeeWXBlMin = atoi(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Screen Dim Brightness (0-255): " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, dimmerModeHidden->getValue(), sizeof(buf));
+  cydWeeWXBlDimmerMode = (cydwwxdimmermode)atoi(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Dimmer Selection (0-4): " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, dimmerStartTimeHidden->getValue(), sizeof(buf));
+  cydWeeWXDimmerStartHour = String(buf).substring(0, 2).toInt();
+  cydWeeWXDimmerStartMinute = String(buf).substring(3, 5).toInt();
+  cydWeeWXDimmerStartTimeInMinutes = cydWeeWXDimmerStartHour * 60 + cydWeeWXDimmerStartMinute;
+  LOG_DEBUG("saveCydWeeWxConfig", "Dimmer Start Time (HH:MM): " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, dimmerEndTimeHidden->getValue(), sizeof(buf));
+  cydWeeWXDimmerEndHour = String(buf).substring(0, 2).toInt();
+  cydWeeWXDimmerEndMinute = String(buf).substring(3, 5).toInt();
+  cydWeeWXDimmerEndTimeInMinutes = cydWeeWXDimmerEndHour * 60 + cydWeeWXDimmerEndMinute;
+  LOG_DEBUG("saveCydWeeWxConfig", "Dimmer End Time (HH:MM): " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, riseSetOffsetHidden->getValue(), sizeof(buf));
+  cydWeeWXRiseSetOffset = atoi(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Rise/Set Offset: " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, ldrHighThresholdHidden->getValue(), sizeof(buf));
+  cydWeeWXLdrHighThreshold = atoi(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Light Sensor Threshold (0-4095): " << String(buf));
+
+  memset(buf, '\0', strlen(buf));
+  strlcpy(buf, ldrLowThresholdHidden->getValue(), sizeof(buf));
+  cydWeeWXLdrLowThreshold = atoi(buf);
+  LOG_DEBUG("saveCydWeeWxConfig", "Light Sensor Low Threshold (0-4095): " << String(buf));
+  
   LOG_DEBUG("saveCydWeeWxConfig","Save config to preferences: " << cydWeeWXUrl.c_str());
   cydWeeWXPreference.begin(CYD_WWX_PREFERENCES_NAMESPACE, CYD_WWX_PREFERENCES_RW);
-  cydWeeWXPreference.putString(CYD_WWX_PREFERENCES_KEY, cydWeeWXUrl);
+  cydWeeWXPreference.putString(CYD_WWX_PREF_KEY_URL, cydWeeWXUrl);
+  cydWeeWXPreference.putString(CYD_WWX_PREF_KEY_HOSTNAME, cydWeeWXHostname);
+  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_MAX_BRIGHTNESS, cydWeeWXBlMax);
+  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_MIN_BRIGHTNESS, cydWeeWXBlMin);
+  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_DIMMER_MODE, (uint16_t)cydWeeWXBlDimmerMode);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_START_HOUR, cydWeeWXDimmerStartHour);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_START_MINUTE, cydWeeWXDimmerStartMinute);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_END_HOUR, cydWeeWXDimmerEndHour);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_DIMMER_END_MINUTE, cydWeeWXDimmerEndMinute);
+  cydWeeWXPreference.putInt(CYD_WWX_PREF_KEY_RISE_SET_OFFSET, cydWeeWXRiseSetOffset);
+  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_LDR_HIGH_THRESHOLD, cydWeeWXLdrHighThreshold);
+  cydWeeWXPreference.putUShort(CYD_WWX_PREF_KEY_LDR_LOW_THRESHOLD, cydWeeWXLdrLowThreshold);
   cydWeeWXPreference.end();
 }
 
@@ -1661,10 +1959,14 @@ void saveCydWeeWxConfigCB() {
 
 // Setup for cydWeeWX
 void setup() {
+  char buf[64] = {};
   String LVGL_Arduino = String("LVGL Library Version: ") + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
   Serial.begin(115200);
   delay(3000);
   Serial.setDebugOutput(true); 
+  #ifdef CYD_WWX_RUN_ON_WOKWI
+  LOG_INFO("setup", "Starting cydWeeWX built for wokwi simulation.");
+  #endif // CYD_WWX_RUN_ON_WOKWI
   LOG_INFO("setup", "Starting " << String(programName) << " Version: " << String(programVersion) << " Board Type: " << CYD_WWX_BOARD_TYPE); 
   LOG_INFO("setup", "Starting " << LVGL_Arduino);
 
@@ -1675,8 +1977,11 @@ void setup() {
   lv_tick_set_cb(cydWeeWXTickCB);
 
   // Initialize the TFT display using the TFT_eSPI library
+  memset(draw_buf, 0x00, sizeof(draw_buf));
   cydWeeWXDisp = lv_tft_espi_create(CYD_WWX_SCREEN_WIDTH, CYD_WWX_SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
   lv_display_set_rotation(cydWeeWXDisp, CYD_WWX_ROTATE_SCREEN);
+  createBootGui();
+  lv_refr_now( NULL );
 
   // Set up Task Scheduler
   cydScheduler.init();
@@ -1687,6 +1992,9 @@ void setup() {
   cydScheduler.addTask(tProcessWifiManager);
   cydScheduler.addTask(tTimerWifiManager);
   cydScheduler.addTask(tTimerErrorState);
+  
+  // Load parameters from Preferences (WeeWX URL, Backlight configuration, etc.)
+  loadCydWeeWXConfig();
 
   // Configure Backlight if appropriate
   #ifndef TFT_BL  // Comment out #define TFT_BL in User_Setup.h to set backlight here
@@ -1695,10 +2003,10 @@ void setup() {
   if (!ledcAttach(CYD_WWX_BL_PIN, CYD_WWX_BL_BASE_FREQ, CYD_WWX_BL_TIMER_8_BIT)) {
     LOG_ERROR("setup", "ledcAttach failure for pin: " << CYD_WWX_BL_PIN);
   } else {
-    if (!ledcWrite(CYD_WWX_BL_PIN, CYD_WWX_BL_BRIGHTNESS)) {
+    if (!ledcWrite(CYD_WWX_BL_PIN, cydWeeWXBlCurrent)) {
       LOG_ERROR("setup", "Backlight could not be set on pin: " << CYD_WWX_BL_PIN);
     } else {
-      LOG_DEBUG("setup", "LCD backlight set to: " << (CYD_WWX_BL_BRIGHTNESS * 100)/((2^CYD_WWX_BL_TIMER_8_BIT)-1) << "%"); 
+      LOG_DEBUG("setup", "LCD backlight set to: " << (cydWeeWXBlCurrent * 100)/((2^CYD_WWX_BL_TIMER_8_BIT)-1) << "%"); 
     }
   }
   #ifdef CYD_WWX_LDR_PIN
@@ -1709,9 +2017,6 @@ void setup() {
   tTimerReadLDR.enable();
   #endif // CYD_WWX_LDR_PIN
   #endif // TFT_BL
-
-  // Load WeeWX URL from Preferences
-  loadCydWeeWXConfig();
 
   // Set up WiFi Manager
   pinMode(cydWeeWXTriggerPin, INPUT_PULLUP);  // Pin to detect to activate WiFi Manager Portal
@@ -1724,11 +2029,50 @@ void setup() {
   #endif  // CYD_WWX_WOKWI_ENTER_AP_AT_BOOT
   #endif  // CYD_WWX_RUN_ON_WOKWI
   
-  wmWeeWXUrl = new WiFiManagerParameter("URL", "WeeWX URL", cydWeeWXUrl.c_str(), CYD_WWX_WEEWX_URL_FIELD_LENGTH);
-  
+  wmWeeWXUrl = new WiFiManagerParameter("URL", "WeeWX URL", cydWeeWXUrl.c_str(), CYD_WWX_STRING_FIELD_LENGTH);
+  wmCydWeeWXHostname = new WiFiManagerParameter("HOSTNAME", "cydWeeWX Hostname", cydWeeWXHostname.c_str(), CYD_WWX_STRING_FIELD_LENGTH);
+  screenMaxBrightness = new WiFiManagerParameter(screenMaxBrightnessHtml);
+  screenMaxBrightnessHidden = new WiFiManagerParameter("MAXBRIGHTNESSHIDDEN", "", String(cydWeeWXBlMax).c_str(), 10, WFM_NO_LABEL);
+  screenDimBrightness = new WiFiManagerParameter(screenDimBrightnessHtml);
+  screenDimBrightnessHidden = new WiFiManagerParameter("DIMBRIGHTNESSHIDDEN", "", String(cydWeeWXBlMin).c_str(), 10, WFM_NO_LABEL);
+  dimmerMode = new WiFiManagerParameter(dimmerModeHtml);
+  dimmerModeHidden = new WiFiManagerParameter("DIMMERMODEHIDDEN", "", String((int)cydWeeWXBlDimmerMode).c_str(), 10, WFM_NO_LABEL);
+  dimmerStartTime = new WiFiManagerParameter(dimmerStartTimeHtml);
+  sprintf(buf, "%02d:%02d", cydWeeWXDimmerStartHour, cydWeeWXDimmerStartMinute);
+  dimmerStartTimeHidden = new WiFiManagerParameter("DIMMERSTARTTIMEHIDDEN", "", buf, 10, WFM_NO_LABEL);
+  dimmerEndTime = new WiFiManagerParameter(dimmerEndTimeHtml);
+  sprintf(buf, "%02d:%02d", cydWeeWXDimmerEndHour, cydWeeWXDimmerEndMinute);
+  dimmerEndTimeHidden = new WiFiManagerParameter("DIMMERENDTIMEHIDDEN", "", buf, 10, WFM_NO_LABEL);
+  riseSetOffset = new WiFiManagerParameter(riseSetOffsetHtml);
+  riseSetOffsetHidden = new WiFiManagerParameter("RISESETOFFSETHIDDEN", "", String(cydWeeWXRiseSetOffset).c_str(), 10, WFM_NO_LABEL);
+  ldrHighThreshold = new WiFiManagerParameter(ldrHighThresholdHtml);
+  ldrHighThresholdHidden = new WiFiManagerParameter("LDRHIGHTHRESHOLDHIDDEN", "", String(cydWeeWXLdrHighThreshold).c_str(), 10, WFM_NO_LABEL);
+  ldrLowThreshold = new WiFiManagerParameter(ldrLowThresholdHtml);
+  ldrLowThresholdHidden = new WiFiManagerParameter("LDRLOWTHRESHOLDHIDDEN", "", String(cydWeeWXLdrLowThreshold).c_str(), 10, WFM_NO_LABEL);
+
+
+  wm.setCustomHeadElement(customWmHeaderHtml);
   wm.addParameter(wmWeeWXUrl);
+  wm.addParameter(wmCydWeeWXHostname);
+  wm.addParameter(screenMaxBrightness);
+  wm.addParameter(screenMaxBrightnessHidden);
+  wm.addParameter(screenDimBrightness);
+  wm.addParameter(screenDimBrightnessHidden);
+  wm.addParameter(dimmerMode);
+  wm.addParameter(dimmerModeHidden);
+  wm.addParameter(dimmerStartTime);
+  wm.addParameter(dimmerStartTimeHidden);
+  wm.addParameter(dimmerEndTime);
+  wm.addParameter(dimmerEndTimeHidden);
+  wm.addParameter(riseSetOffset);
+  wm.addParameter(riseSetOffsetHidden);
+  wm.addParameter(ldrHighThreshold);
+  wm.addParameter(ldrHighThresholdHidden);
+  wm.addParameter(ldrLowThreshold);
+  wm.addParameter(ldrLowThresholdHidden);
+
   wm.setSaveParamsCallback(saveCydWeeWxConfigCB);
-  wm.setHostname(CYD_WWX_HOSTNAME);
+  wm.setHostname(cydWeeWXHostname);
   wm.setWiFiAutoReconnect(true);
   wm.setTitle(CYD_WWX_WM_TITLE);
   
@@ -1740,10 +2084,10 @@ void setup() {
   wm.setBreakAfterConfig(true);   // always exit configportal even if wifi save fails
   
   wm.setConfigPortalBlocking(false);
-  wm.setHostname(CYD_WWX_HOSTNAME);
+
+  wm._preloadwifiscan = true; // Preload WiFi scan results to improve performance of WiFi selection in portal
 
   #ifdef WIFI_MANAGER_ENABLE_PASSWORD_RANDOM
-  char buf[32] = {};
   cydWeeWXPassword = String(cydWeeWXPassword + "%04d");
   sprintf(buf, cydWeeWXPassword.c_str(), random(10000));
   cydWeeWXPassword = String(buf);
@@ -1752,29 +2096,20 @@ void setup() {
   LOG_INFO("setup", "Starting WiFi Manager AP: " << CYD_WWX_WM_AP_NAME << " Password: " << cydWeeWXPassword);
 
   // WM in nonblocking mode so checking return status has limited value
-  if(wm.autoConnect(CYD_WWX_WM_AP_NAME, cydWeeWXPassword.c_str())) {  
+  if(wm.autoConnect(cydWeeWXHostname.c_str(), cydWeeWXPassword.c_str())) {  
     LOG_INFO("setup", "WiFi Connected");
   }
 
  
 
   if (WiFi.status() == WL_CONNECTED) {
-    LOG_INFO("setup", "Create main cydWeeWX display and update.");
-    
-    createMainWeeWXGui();
-    getWeeWXData();
-    getOpenMeteoData();
-    
-    tWeeWXUpdate.enable();
-    tOpenMeteoUpdate.enable();
-
+    LOG_INFO("setup", "Create main cydWeeWX display and update.");    
+    displayReInit(displayname::WEEWX_MAIN);
   } else {
     LOG_INFO("setup", "Wifi is NOT connected.");
-    setWifiMessage();
-    createMainWifiManagerGui();
-
     tProcessWifiManager.enable();
     tTimerWifiManager.enable();
+    displayReInit(displayname::WIFI_MANAGER_MAIN);
   }
 
   tCydWeeWXTriggerPin.enable();
